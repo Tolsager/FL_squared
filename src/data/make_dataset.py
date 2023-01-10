@@ -4,7 +4,7 @@ import logging
 import torchvision
 import torch
 import os
-from typing import Tuple
+from typing import *
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
 
