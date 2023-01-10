@@ -1,8 +1,25 @@
 # -*- coding: utf-8 -*-
 import click
 import logging
+import torchvision
+import torch
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
+
+
+def download_dataset(save_path: str = 'data/raw') -> None:
+    """Download the CIFAR10 dataset and apply normalization and tensor conversion."""
+
+    # TODO: Determine whether or not to normalize based on entire population, since clients will not have the full set.
+    transforms = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
+                                                 torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465),
+                                                                                  (0.247, 0.243, 0.261))])
+    train = torchvision.datasets.CIFAR10(root=save_path, train=True, transform=transforms, download=True)
+    test = torchvision.datasets.CIFAR10(root=save_path, train=False, transform=transforms, download=True)
+
+    torch.save(train, 'data/processed/train.pt')
+    torch.save(test, 'data/processed/test.pt')
+
 
 
 @click.command()
