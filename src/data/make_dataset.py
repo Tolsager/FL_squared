@@ -4,12 +4,13 @@ import logging
 import torchvision
 import torch
 import os
+from typing import Tuple
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
 
 
 def download_dataset(save_path: str = "data/raw") -> None:
-    """Download the CIFAR10 dataset and apply normalization and tensor conversion."""
+    """Download the CIFAR10 dataset and apply tensor conversion."""
     # TODO: Determine whether or not to normalize based on entire population, since clients will not have the full set.
     os.makedirs(save_path, exist_ok=True)
     transforms = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
@@ -19,6 +20,12 @@ def download_dataset(save_path: str = "data/raw") -> None:
     torch.save(train, 'data/raw/train.pt')
     torch.save(test, 'data/raw/test.pt')
 
+
+def load_dataset(load_path: str = "data/raw") -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
+    train = torch.load(os.path.join(load_path, "train.pt"))
+    test = torch.load(os.path.join(load_path, "test.pt"))
+
+    return train, test
 
 
 @click.command()
