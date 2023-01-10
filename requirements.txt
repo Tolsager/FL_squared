@@ -11,3 +11,5 @@ python-dotenv>=0.5.1
 # project packages
 torch
 torchvision
+pytest
+isort
