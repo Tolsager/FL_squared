@@ -13,3 +13,4 @@ torch
 torchvision
 pytest
 isort
+pre-commit
