@@ -1,7 +1,9 @@
+import os
+
 import pytest
 import torch
+
 from src.data import make_dataset
-import os
 
 
 def test_download():
@@ -10,8 +12,12 @@ def test_download():
     assert os.path.exists("data/raw/test.pt")
 
 
-@pytest.mark.skipif(not os.path.exists("data/raw/train.pt"), reason="Dataset not downloaded")
-@pytest.mark.skipif(not os.path.exists("data/raw/test.pt"), reason="Dataset not downloaded")
+@pytest.mark.skipif(
+    not os.path.exists("data/raw/train.pt"), reason="Dataset not downloaded"
+)
+@pytest.mark.skipif(
+    not os.path.exists("data/raw/test.pt"), reason="Dataset not downloaded"
+)
 class TestData:
     def test_length(self):
         assert len(torch.load("data/raw/train.pt")) == 50_000

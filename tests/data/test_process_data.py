@@ -1,9 +1,11 @@
+import os
+
+import numpy as np
+import pytest
 import torch
 import torchvision
-import numpy as np
-from src.data.process_data import DataSplitter, sort_torch_dataset, cifar10_sort_fn
-import pytest
-import os
+
+from src.data.process_data import DataSplitter, cifar10_sort_fn, sort_torch_dataset
 
 save_path = "data/raw"
 transforms = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])

@@ -1,7 +1,8 @@
-import torch
 from collections.abc import Callable, Iterable
+from typing import Any
+
 import numpy as np
-from typing import *
+import torch
 
 
 class DataSplitter:
@@ -43,7 +44,8 @@ class DataSplitter:
             replace=False,
         )
 
-        # append extra element to shard_indices to prevent going out of bounds when splitting data
+        # append extra element to shard_indices to prevent going out of bounds when
+        # splitting data
         shard_indices = np.append(shard_indices, self.n_samples)
 
         # from the shard indices assigned to each client, get the
@@ -66,7 +68,7 @@ class DataSplitter:
 
 
 def sort_torch_dataset(
-    dataset: torch.utils.data.Dataset, sort_fn: Callable[[], Any]
+    dataset: torch.utils.data.Dataset, sort_fn: Callable[[Iterable], Any]
 ) -> torch.utils.data.Dataset:
     # sort the data by label
     sorted_ds = sorted(dataset, key=sort_fn)
