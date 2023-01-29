@@ -94,6 +94,6 @@ class ClientCNN(pl.LightningModule):
     def configure_optimizers(self):
         return torch.optim.AdamW(self.parameters(), lr=1e-3)
 
-
-Server = Server(3)
-Server.update()
+if __name__ == '__main__':
+    Server = Server(3)
+    Server.update()
