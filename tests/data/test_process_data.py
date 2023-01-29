@@ -10,7 +10,7 @@ from src.data.process_data import DataSplitter, cifar10_sort_fn, sort_torch_data
 save_path = "data/raw"
 transforms = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
 dataset = torchvision.datasets.CIFAR10(
-    root=save_path, train=False, transform=transforms, download=False
+    root=save_path, train=False, transform=transforms, download=True
 )
 dataset = torch.utils.data.Subset(dataset, range(100))
 
