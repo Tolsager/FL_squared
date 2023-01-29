@@ -69,7 +69,6 @@ def sort_torch_dataset(
     dataset: torch.utils.data.Dataset, sort_fn: Callable[[], Any]
 ) -> torch.utils.data.Dataset:
     # sort the data by label
-    sort_fn = lambda x: x[1]
     sorted_ds = sorted(dataset, key=sort_fn)
     return sorted_ds
 
