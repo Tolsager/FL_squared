@@ -1,6 +1,6 @@
 [![codecov](https://codecov.io/gh/Tolsager/FL_squared/branch/main/graph/badge.svg?token=09DLZ155KU)](https://codecov.io/gh/Tolsager/FL_squared)
 
-fl_squared
+FL Squared
 ==============================
 
 Exploring the use of feature learning in federated learning
