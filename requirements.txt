@@ -14,3 +14,5 @@ torchvision
 pytest
 isort
 pre-commit
+black
+pytorch-lightning
