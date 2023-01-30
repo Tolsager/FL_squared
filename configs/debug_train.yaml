@@ -1,7 +1,8 @@
 server:
   n_clients: 2
   shards_per_client: 1
-  rounds: 1
+  rounds: 2
   batch_size: 2
-  n_samples: 4
+  n_samples: 1000
   E: 1
+  C: 1.0

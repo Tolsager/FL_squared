@@ -1,10 +1,9 @@
 # import os
 
 import click
-
-# import wandb
 from dotenv import find_dotenv, load_dotenv
 
+import wandb
 from src import utils
 from src.models import model
 
@@ -13,8 +12,10 @@ from src.models import model
 @click.option("--config-file", type=str, default="debug_train")
 def train_fl(config_file: str):
     config = utils.load_config(config_file)
+    tags = ["debug"]
+    wandb.init(config=config, project="rep-in-fed", entity="pydqn", tags=tags)
     server = model.Server(**config["server"])
-    server.train_clients()
+    server.train()
 
 
 def train_bl():
