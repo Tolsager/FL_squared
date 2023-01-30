@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/Tolsager/FL_squared/branch/main/graph/badge.svg?token=09DLZ155KU)](https://codecov.io/gh/Tolsager/FL_squared)
+
 fl_squared
 ==============================
 
