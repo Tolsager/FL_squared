@@ -1,0 +1,7 @@
+server:
+  n_clients: 2
+  shards_per_client: 1
+  rounds: 1
+  batch_size: 2
+  n_samples: 4
+  E: 1
