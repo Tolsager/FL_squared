@@ -14,7 +14,6 @@ def download_dataset(save_path: str = "data/raw") -> None:
     """Download the CIFAR10 dataset and apply tensor conversion."""
     # TODO: Determine whether or not to normalize based on entire population,
     # since clients will not have the full set.
-    os.makedirs(save_path, exist_ok=True)
     transforms = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
     train = torchvision.datasets.CIFAR10(
         root=save_path, train=True, transform=transforms, download=True
@@ -28,10 +27,14 @@ def download_dataset(save_path: str = "data/raw") -> None:
 
 
 def load_dataset(
-    load_path: str = "data/raw",
+    load_path: str = "data/raw", n_samples: int = None
 ) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
     train = torch.load(os.path.join(load_path, "train.pt"))
     test = torch.load(os.path.join(load_path, "test.pt"))
+
+    if n_samples is not None:
+        train = torch.utils.data.Subset(train, range(n_samples))
+        test = torch.utils.data.Subset(test, range(n_samples))
 
     return train, test
 
@@ -45,6 +48,8 @@ def main(input_filepath, output_filepath):
     """
     logger = logging.getLogger(__name__)
     logger.info("making final data set from raw data")
+
+    download_dataset(input_filepath)
 
 
 if __name__ == "__main__":
