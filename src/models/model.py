@@ -1,13 +1,13 @@
-import torch
-import random
-import pytorch_lightning as pl
-import torch.nn as nn
-import numpy as np
-
 import copy
-from typing import Tuple, List
+import random
+from typing import List, Tuple
 
-from src.data import process_data, make_dataset
+import numpy as np
+import pytorch_lightning as pl
+import torch
+import torch.nn as nn
+
+from src.data import make_dataset, process_data
 
 
 class Server:
@@ -17,13 +17,16 @@ class Server:
         self.server_side_model = ClientCNN()
         self.client_list = None
         self.training_set, self.test_set = make_dataset.load_dataset()
-        self.data_splitter = process_data.DataSplitter(self.training_set, self.num_clients)
+        self.data_splitter = process_data.DataSplitter(
+            self.training_set, self.num_clients
+        )
         self.client_datasets = self.data_splitter.split_data()
 
     def generate_clients(self) -> List[pl.LightningModule]:
         return [copy.deepcopy(self.server_side_model) for _ in range(self.num_clients)]
 
     def update(self):
+        # TODO: can be optimized to only update the models that are going to be trained
         self.client_list = self.generate_clients()
         clients_to_train = random.randint(1, self.num_clients)
         samples = random.sample(range(len(self.client_list)), clients_to_train)
@@ -45,8 +48,9 @@ class Server:
         avg_state_dict = self.get_neutral_state_dict()
         for client_idx in samples:
             for key in avg_state_dict.keys():
-                avg_state_dict[key] += self.client_list[client_idx].state_dict()[key] * len(
-                    self.client_datasets[client_idx])
+                avg_state_dict[key] += self.client_list[client_idx].state_dict()[
+                    key
+                ] * len(self.client_datasets[client_idx])
 
         for key in avg_state_dict.keys():
             avg_state_dict[key] /= data_size
@@ -64,27 +68,37 @@ class Server:
 class ClientCNN(pl.LightningModule):
     def __init__(self):
         super().__init__()
-        self.criterion = nn.CrossEntropyLoss()  # TODO: representation learning; contrastive loss
-        self.input = nn.Sequential(nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, padding=1),
-                                   nn.ReLU())
-        self.block = nn.Sequential(nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding=1),
-                                   nn.ReLU(),
-                                   nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1),
-                                   nn.ReLU(),
-                                   nn.MaxPool2d(2))
-        self.out = nn.Sequential(nn.Flatten(),
-                                 nn.Linear(32 * 16 * 16, 256),
-                                 nn.ReLU(),
-                                 nn.Linear(256, 256),
-                                 nn.ReLU(),
-                                 nn.Linear(256, 10))
+        self.criterion = (
+            nn.CrossEntropyLoss()
+        )  # TODO: representation learning; contrastive loss
+        self.input = nn.Sequential(
+            nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, padding=1),
+            nn.ReLU(),
+        )
+        self.block = nn.Sequential(
+            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+        )
+        self.out = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(32 * 16 * 16, 256),
+            nn.ReLU(),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+            nn.Linear(256, 10),
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.input(x)
         x = self.block(x)
         return self.out(x)
 
-    def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
+    def training_step(
+        self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
+    ) -> torch.Tensor:
         images, labels = batch
         logits = self(images)
         loss = self.criterion(logits, labels)
