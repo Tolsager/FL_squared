@@ -14,7 +14,15 @@ def download_dataset(save_path: str = "data/raw") -> None:
     """Download the CIFAR10 dataset and apply tensor conversion."""
     # TODO: Determine whether or not to normalize based on entire population,
     # since clients will not have the full set.
-    transforms = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
+    os.makedirs(save_path, exist_ok=True)
+    transforms = torchvision.transforms.Compose(
+        [
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize(
+                (0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)
+            ),
+        ]
+    )
     train = torchvision.datasets.CIFAR10(
         root=save_path, train=True, transform=transforms, download=True
     )

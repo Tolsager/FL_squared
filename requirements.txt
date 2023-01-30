@@ -16,3 +16,4 @@ isort
 pre-commit
 black
 wandb
+pytorch-lightning
