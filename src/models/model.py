@@ -43,10 +43,11 @@ class Server:
             self.test_set, batch_size=batch_size
         )
         self.test_trainer = (
-            Trainer(accelerator="gpu", devices=1)
+            Trainer(accelerator="gpu", devices=1, enable_model_summary=False)
             if torch.cuda.is_available()
-            else Trainer()
+            else Trainer(enable_model_summary=False)
         )
+        self.client_trainers = []
 
     def generate_clients(self) -> List[LightningModule]:
         return [copy.deepcopy(self.server_side_model) for _ in range(self.n_clients)]
@@ -55,6 +56,8 @@ class Server:
         # TODO: can be optimized to only update the models that are going to be trained
         self.client_list = self.generate_clients()
 
+        self.client_trainers = []
+
         clients_to_train = random.sample(range(self.n_clients), self.m)
 
         # Amount of samples used to train the clients in the current round
@@ -62,15 +65,21 @@ class Server:
 
         # Train each client sequentially, TODO: parallelization
         for client_idx in clients_to_train:
+            client_trainer = (
+                Trainer(
+                    max_epochs=self.E,
+                    accelerator="gpu",
+                    devices=1,
+                    enable_model_summary=False,
+                )
+                if torch.cuda.is_available()
+                else Trainer(max_epochs=self.E, enable_model_summary=False)
+            )
+            self.client_trainers.append(client_trainer)
             client = self.client_list[client_idx]
             client_dataset = self.client_datasets[client_idx]
             client_loader = torch.utils.data.DataLoader(
                 client_dataset, batch_size=self.batch_size
-            )
-            client_trainer = (
-                Trainer(max_epochs=self.E, accelerator="gpu", devices=1)
-                if torch.cuda.is_available()
-                else Trainer(max_epochs=self.E)
             )
             client_trainer.fit(client, client_loader)
 
@@ -78,9 +87,10 @@ class Server:
         avg_state_dict = self.get_neutral_state_dict()
         for client_idx in clients_to_train:
             for key in avg_state_dict.keys():
-                avg_state_dict[key] += self.client_list[client_idx].state_dict()[
-                    key
-                ] * len(self.client_datasets[client_idx])
+                weighted_params = self.client_list[client_idx].state_dict()[key] * len(
+                    self.client_datasets[client_idx]
+                )
+                avg_state_dict[key] = avg_state_dict[key] + weighted_params
 
         for key in avg_state_dict.keys():
             avg_state_dict[key] /= data_size
@@ -156,7 +166,7 @@ class ClientCNN(LightningModule):
         self.log("test_accuracy", accuracy)
 
     def configure_optimizers(self):
-        return torch.optim.AdamW(self.parameters(), lr=1e-3)
+        return torch.optim.AdamW(self.parameters(), lr=0.001)
 
 
 if __name__ == "__main__":

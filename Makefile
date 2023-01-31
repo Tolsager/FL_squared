@@ -20,6 +20,14 @@ endif
 # COMMANDS                                                                      #
 #################################################################################
 
+
+# our commands
+
+## train
+train:
+	$(PYTHON_INTERPRETER) src/models/train_model.py --config-file train
+
+
 ## Install Python Dependencies
 requirements: test_environment
 	$(PYTHON_INTERPRETER) -m pip install -U pip setuptools wheel
