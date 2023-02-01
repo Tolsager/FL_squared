@@ -115,8 +115,10 @@ class Server:
 
 
 class ClientCNN(LightningModule):
-    def __init__(self):
+    def __init__(self, learning_rate: float):
         super().__init__()
+
+        self.learning_rate = learning_rate
 
         self.accuracy = Accuracy(task="multiclass", num_classes=10)
 
@@ -157,6 +159,14 @@ class ClientCNN(LightningModule):
 
         return loss
 
+    def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int):
+        images, labels = batch
+        logits = self(images)
+        loss = self.criterion(logits, labels)
+        accuracy = self.accuracy(logits, labels)
+        self.log("val_loss", loss)
+        self.log("val_accuracy", accuracy)
+
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int):
         images, labels = batch
         logits = self(images)
@@ -166,7 +176,7 @@ class ClientCNN(LightningModule):
         self.log("test_accuracy", accuracy)
 
     def configure_optimizers(self):
-        return torch.optim.AdamW(self.parameters(), lr=0.001)
+        return torch.optim.AdamW(self.parameters(), lr=self.learning_rate)
 
 
 if __name__ == "__main__":

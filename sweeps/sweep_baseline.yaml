@@ -10,8 +10,6 @@ parameters:
     value: 10
   seed:
     value: 1
-early_terminate:
-  type: hyperband
-  max_iter: 3
-  s: 3
-  eta: 1
+  epochs:
+    value: 1
+
