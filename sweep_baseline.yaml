@@ -8,8 +8,10 @@ parameters:
     values: [0.01, 0.001, 0.005, 0.0075]
   batch_size:
     value: 10
+  seed:
+    value: 1
 early_terminate:
   type: hyperband
   max_iter: 3
   s: 3
-  eta: 3
+  eta: 1
