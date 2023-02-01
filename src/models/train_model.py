@@ -14,6 +14,8 @@ def train_fl(config_file: str):
     config = utils.load_config(config_file)
     tags = ["debug"]
     wandb.init(config=config, project="rep-in-fed", entity="pydqn", tags=tags)
+    config = wandb.config
+    config.server.n_clients
     server = model.Server(**config["server"])
     server.train()
 
