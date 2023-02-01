@@ -5,7 +5,12 @@ import pytest
 import torch
 import torchvision
 
-from src.data.process_data import DataSplitter, cifar10_sort_fn, sort_torch_dataset
+from src.data.process_data import (
+    DataSplitter,
+    cifar10_sort_fn,
+    sort_torch_dataset,
+    val_test_split,
+)
 
 save_path = "data/raw"
 transforms = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
@@ -49,3 +54,18 @@ def test_sort_torch_dataset():
     # test that the data is strictly increasing which implies that it's sorted
     for i in range(1, len(sorted_ds)):
         assert sorted_ds[i][1] >= sorted_ds[i - 1][1]
+
+
+def test_val_test_split():
+    dataset = torchvision.datasets.CIFAR10(
+        root=save_path, train=False, transform=transforms, download=True
+    )
+    ds_list = val_test_split(dataset, 60)
+    ds_val = ds_list[0]
+    ds_test = ds_list[1]
+
+    assert isinstance(ds_val, torch.utils.data.dataset.Subset)
+    assert isinstance(ds_test, torch.utils.data.dataset.Subset)
+
+    assert len(ds_val) == 60
+    assert len(ds_test) == len(dataset) - 60

@@ -1,5 +1,5 @@
 from collections.abc import Callable, Iterable
-from typing import Any
+from typing import Any, Union
 
 import numpy as np
 import torch
@@ -78,3 +78,20 @@ def sort_torch_dataset(
 def cifar10_sort_fn(batch: tuple[torch.Tensor]):
     # return the label
     return batch[1]
+
+
+def val_test_split(
+    dataset: torch.utils.data.Dataset, val_size: Union[int, float]
+) -> list[torch.utils.data.dataset.Subset]:
+    if isinstance(val_size, int):
+        val_split = torch.utils.data.Subset(dataset, range(val_size))
+        test_split = torch.utils.data.Subset(dataset, range(val_size, len(dataset)))
+    else:
+
+        # calculate number of samples in the validation split
+        n_val_samples = val_size * len(dataset)
+        val_split = torch.utils.data.Subset(dataset, range(n_val_samples))
+        test_split = torch.utils.data.Subset(
+            dataset, range(n_val_samples, len(dataset))
+        )
+    return [val_split, test_split]
