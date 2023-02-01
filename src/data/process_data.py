@@ -1,5 +1,5 @@
 from collections.abc import Callable, Iterable
-from typing import Any, Union
+from typing import Any, Union, Tuple
 
 import numpy as np
 import torch
@@ -7,10 +7,10 @@ import torch
 
 class DataSplitter:
     def __init__(
-        self,
-        dataset: torch.utils.data.Dataset,
-        n_clients: int,
-        shards_per_client: int = 2,
+            self,
+            dataset: torch.utils.data.Dataset,
+            n_clients: int,
+            shards_per_client: int = 2,
     ):
         self.dataset = dataset
         self.n_clients = n_clients
@@ -68,7 +68,7 @@ class DataSplitter:
 
 
 def sort_torch_dataset(
-    dataset: torch.utils.data.Dataset, sort_fn: Callable[[Iterable], Any]
+        dataset: torch.utils.data.Dataset, sort_fn: Callable[[Iterable], Any]
 ) -> torch.utils.data.Dataset:
     # sort the data by label
     sorted_ds = sorted(dataset, key=sort_fn)
@@ -81,17 +81,22 @@ def cifar10_sort_fn(batch: tuple[torch.Tensor]):
 
 
 def val_test_split(
-    dataset: torch.utils.data.Dataset, val_size: Union[int, float]
-) -> list[torch.utils.data.dataset.Subset]:
-    if isinstance(val_size, int):
-        val_split = torch.utils.data.Subset(dataset, range(val_size))
-        test_split = torch.utils.data.Subset(dataset, range(val_size, len(dataset)))
-    else:
+        dataset: torch.utils.data.Dataset, val_size: Union[int, float], shuffle: bool = False
+) -> Tuple[torch.utils.data.dataset.Subset, torch.utils.data.dataset.Subset]:
 
+    if shuffle:
+        indices = np.random.choice(len(dataset), len(dataset), replace=False)
+    else:
+        indices = range(len(dataset))
+
+    if isinstance(val_size, int):
+        val_split = torch.utils.data.Subset(dataset, indices[:val_size])
+        test_split = torch.utils.data.Subset(dataset, indices[val_size:])
+    else:
         # calculate number of samples in the validation split
-        n_val_samples = val_size * len(dataset)
-        val_split = torch.utils.data.Subset(dataset, range(n_val_samples))
+        n_val_samples = int(val_size * len(dataset))
+        val_split = torch.utils.data.Subset(dataset, indices[:n_val_samples])
         test_split = torch.utils.data.Subset(
-            dataset, range(n_val_samples, len(dataset))
+            dataset, indices[n_val_samples:]
         )
-    return [val_split, test_split]
+    return val_split, test_split
