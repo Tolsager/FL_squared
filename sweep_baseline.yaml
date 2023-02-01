@@ -1,0 +1,15 @@
+program: src/models/train_model.py
+method: grid
+metric:
+  name: val_loss
+  goal: minimize
+parameters:
+  learning_rate:
+    values: [0.01, 0.001, 0.005, 0.0075]
+  batch_size:
+    value: 10
+early_terminate:
+  type: hyperband
+  max_iter: 3
+  s: 3
+  eta: 3
