@@ -5,6 +5,7 @@ from dotenv import find_dotenv, load_dotenv
 
 import torch
 import wandb
+from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning import Trainer
 from src import utils
 from src.models import model
@@ -38,15 +39,14 @@ def train_fl(config_file: str):
 def trainbl(learning_rate: float, batch_size: int, seed: int, epochs: int):
     utils.seed_everything(seed)
 
-    wandb.init(project="rep-in-fed", entity="pydqn")
-    wandb_config = wandb.config
+    logger = WandbLogger(project="rep-in-fed", entity="pydqn")
 
     baseline = model.ClientCNN(learning_rate=learning_rate)
     train, test = model.make_dataset.load_dataset()
     trainloader_bl = torch.utils.data.DataLoader(train, batch_size=batch_size)
     val, _ = process_data.val_test_split(test, 0.2)
     valloader_bl = torch.utils.data.DataLoader(val, batch_size=batch_size)
-    trainer = Trainer(accelerator="gpu", gpus=1, max_epochs=epochs)
+    trainer = Trainer(accelerator="gpu", gpus=1, max_epochs=epochs, logger=logger)
     trainer.fit(baseline, trainloader_bl, valloader_bl)
 
 
