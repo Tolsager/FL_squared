@@ -106,20 +106,20 @@ def train_val_split(
 class AugmentedDataset(torch.utils.data.Dataset):
     def __init__(
         self,
-        transforms: torchvision.transforms.transforms.Compose,
         dataset: torch.utils.data.Dataset,
+        transforms: torchvision.transforms.transforms.Compose,
     ):
         super().__init__()
         self.dataset = dataset
         self.transforms = transforms
 
     def __len__(self):
-        return len(self.ds)
+        return len(self.dataset)
 
     def __getitem__(self, i):
-        image = self.dataset[i]
+        image, label = self.dataset[i]
         augmented_image = self.transforms(image)
-        return augmented_image
+        return augmented_image, label
 
 
 def get_cifar10_transforms() -> torchvision.transforms.transforms.Compose:
