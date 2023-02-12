@@ -4,11 +4,105 @@ from typing import List, Tuple
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from pytorch_lightning import LightningModule, Trainer
 from torchmetrics import Accuracy
 
 import wandb
 from src.data import make_dataset, process_data
+
+
+class SimpNetBackbone(nn.Module):
+    """
+    code copied from the paper authors' github:
+    https://github.com/Coderx7/TF_Pytorch_testbed/blob/master/Pytorch/models/simpnet.py
+    """
+
+    def __init__(self, embedding_size=10, simpnet_name="simpnet"):
+        super().__init__()
+        self.features = self._make_layers()
+        self.fc = nn.Linear(432, embedding_size)
+
+    def forward(self, x):
+        out = self.features(x)
+
+        # Global Max Pooling
+        out = F.max_pool2d(out, kernel_size=out.size()[2:])
+        out = F.dropout2d(out, 0.02, training=True)
+
+        out = out.view(out.size(0), -1)
+        out = self.fc(out)
+        return out
+
+    def _make_layers(self):
+
+        model = nn.Sequential(
+            nn.Conv2d(3, 66, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            #  nn.BatchNorm2d(66, eps=1e-05, momentum=0.05, affine=True),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.01),
+            nn.Conv2d(66, 128, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            #  nn.BatchNorm2d(128, eps=1e-05, momentum=0.05, affine=True),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.03),
+            nn.Conv2d(128, 128, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            #  nn.BatchNorm2d(128, eps=1e-05, momentum=0.05, affine=True),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.03),
+            nn.Conv2d(128, 128, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            #  nn.BatchNorm2d(128, eps=1e-05, momentum=0.05, affine=True),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.03),
+            nn.Conv2d(128, 192, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            #  nn.BatchNorm2d(192, eps=1e-05, momentum=0.05, affine=True),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(
+                kernel_size=(2, 2), stride=(2, 2), dilation=(1, 1), ceil_mode=False
+            ),
+            nn.Dropout2d(p=0.05),
+            nn.Conv2d(192, 192, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            #  nn.BatchNorm2d(192, eps=1e-05, momentum=0.05, affine=True),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.03),
+            nn.Conv2d(192, 192, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            #  nn.BatchNorm2d(192, eps=1e-05, momentum=0.05, affine=True),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.03),
+            nn.Conv2d(192, 192, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            #  nn.BatchNorm2d(192, eps=1e-05, momentum=0.05, affine=True),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.035),
+            nn.Conv2d(192, 192, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            #  nn.BatchNorm2d(192, eps=1e-05, momentum=0.05, affine=True),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.035),
+            nn.Conv2d(192, 288, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            #  nn.BatchNorm2d(288, eps=1e-05, momentum=0.05, affine=True),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(
+                kernel_size=(2, 2), stride=(2, 2), dilation=(1, 1), ceil_mode=False
+            ),
+            nn.Dropout2d(p=0.05),
+            nn.Conv2d(288, 288, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            #  nn.BatchNorm2d(288, eps=1e-05, momentum=0.05, affine=True),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.04),
+            nn.Conv2d(288, 355, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            #  nn.BatchNorm2d(355, eps=1e-05, momentum=0.05, affine=True),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.04),
+            nn.Conv2d(355, 432, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            #  nn.BatchNorm2d(432, eps=1e-05, momentum=0.05, affine=True),
+            nn.ReLU(inplace=True),
+        )
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.xavier_uniform_(
+                    m.weight.data, gain=nn.init.calculate_gain("relu")
+                )
+
+        return model
 
 
 class Server:
@@ -125,30 +219,10 @@ class ClientCNN(LightningModule):
         self.criterion = (
             nn.CrossEntropyLoss()
         )  # TODO: representation learning; contrastive loss
-        self.input = nn.Sequential(
-            nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, padding=1),
-            nn.ReLU(),
-        )
-        self.block = nn.Sequential(
-            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-        )
-        self.out = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(32 * 16 * 16, 256),
-            nn.ReLU(),
-            nn.Linear(256, 256),
-            nn.ReLU(),
-            nn.Linear(256, 10),
-        )
+        self.backbone = SimpNetBackbone(embedding_size=10)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.input(x)
-        x = self.block(x)
-        return self.out(x)
+        return self.backbone(x)
 
     def training_step(
         self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
