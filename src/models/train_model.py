@@ -33,13 +33,14 @@ def train_fl(config_file: str):
 
 @click.command()
 @click.option("--learning_rate", type=float, default=0.001)
-@click.option("--batch_size", type=int, default=10)
+@click.option("--batch_size", type=int, default=16)
 @click.option("--seed", type=int, default=0)
-@click.option("--epochs", type=int, default=1)
+@click.option("--epochs", type=int, default=5)
 def trainbl(learning_rate: float, batch_size: int, seed: int, epochs: int):
     utils.seed_everything(seed)
 
-    logger = WandbLogger(project="rep-in-fed", entity="pydqn")
+    logger = WandbLogger(project="rep-in-fed", entity="pydqn",
+                         notes="simpnet baseline with augmentations, reduced dropout probabilities, groupnorm after all layers")
     transforms = process_data.get_cifar10_transforms()
 
     baseline = model.ClientCNN(learning_rate=learning_rate)

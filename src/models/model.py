@@ -38,61 +38,61 @@ class SimpNetBackbone(nn.Module):
 
         model = nn.Sequential(
             nn.Conv2d(3, 66, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
-            #  nn.BatchNorm2d(66, eps=1e-05, momentum=0.05, affine=True),
+            nn.GroupNorm(11, 66),
             nn.ReLU(inplace=True),
             nn.Dropout2d(p=0.01),
             nn.Conv2d(66, 128, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
-            #  nn.BatchNorm2d(128, eps=1e-05, momentum=0.05, affine=True),
+            nn.GroupNorm(16, 128),
             nn.ReLU(inplace=True),
-            nn.Dropout2d(p=0.03),
+            nn.Dropout2d(p=0.02),
             nn.Conv2d(128, 128, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
-            #  nn.BatchNorm2d(128, eps=1e-05, momentum=0.05, affine=True),
+            nn.GroupNorm(16, 128),
             nn.ReLU(inplace=True),
-            nn.Dropout2d(p=0.03),
+            nn.Dropout2d(p=0.02),
             nn.Conv2d(128, 128, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
-            #  nn.BatchNorm2d(128, eps=1e-05, momentum=0.05, affine=True),
+            nn.GroupNorm(16, 128),
             nn.ReLU(inplace=True),
-            nn.Dropout2d(p=0.03),
+            nn.Dropout2d(p=0.02),
             nn.Conv2d(128, 192, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
-            #  nn.BatchNorm2d(192, eps=1e-05, momentum=0.05, affine=True),
+            nn.GroupNorm(24, 192),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(
                 kernel_size=(2, 2), stride=(2, 2), dilation=(1, 1), ceil_mode=False
             ),
-            nn.Dropout2d(p=0.05),
+            nn.Dropout2d(p=0.04),
             nn.Conv2d(192, 192, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
-            #  nn.BatchNorm2d(192, eps=1e-05, momentum=0.05, affine=True),
+            nn.GroupNorm(24, 192),
             nn.ReLU(inplace=True),
-            nn.Dropout2d(p=0.03),
+            nn.Dropout2d(p=0.02),
             nn.Conv2d(192, 192, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
-            #  nn.BatchNorm2d(192, eps=1e-05, momentum=0.05, affine=True),
+            nn.GroupNorm(24, 192),
             nn.ReLU(inplace=True),
-            nn.Dropout2d(p=0.03),
+            nn.Dropout2d(p=0.02),
             nn.Conv2d(192, 192, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
-            #  nn.BatchNorm2d(192, eps=1e-05, momentum=0.05, affine=True),
+            nn.GroupNorm(24, 192),
             nn.ReLU(inplace=True),
-            nn.Dropout2d(p=0.035),
+            nn.Dropout2d(p=0.025),
             nn.Conv2d(192, 192, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
-            #  nn.BatchNorm2d(192, eps=1e-05, momentum=0.05, affine=True),
+            nn.GroupNorm(24, 192),
             nn.ReLU(inplace=True),
-            nn.Dropout2d(p=0.035),
+            nn.Dropout2d(p=0.025),
             nn.Conv2d(192, 288, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
-            #  nn.BatchNorm2d(288, eps=1e-05, momentum=0.05, affine=True),
+            nn.GroupNorm(24, 288),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(
                 kernel_size=(2, 2), stride=(2, 2), dilation=(1, 1), ceil_mode=False
             ),
-            nn.Dropout2d(p=0.05),
+            nn.Dropout2d(p=0.04),
             nn.Conv2d(288, 288, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
-            #  nn.BatchNorm2d(288, eps=1e-05, momentum=0.05, affine=True),
+            nn.GroupNorm(24, 288),
             nn.ReLU(inplace=True),
-            nn.Dropout2d(p=0.04),
+            nn.Dropout2d(p=0.03),
             nn.Conv2d(288, 355, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
-            #  nn.BatchNorm2d(355, eps=1e-05, momentum=0.05, affine=True),
+            nn.GroupNorm(71, 355),
             nn.ReLU(inplace=True),
-            nn.Dropout2d(p=0.04),
+            nn.Dropout2d(p=0.03),
             nn.Conv2d(355, 432, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
-            #  nn.BatchNorm2d(432, eps=1e-05, momentum=0.05, affine=True),
+            nn.GroupNorm(27, 432),
             nn.ReLU(inplace=True),
         )
 
@@ -230,6 +230,8 @@ class ClientCNN(LightningModule):
         images, labels = batch
         logits = self(images)
         loss = self.criterion(logits, labels)
+        self.log("training_loss", loss)
+        self.log("training_accuracy", self.accuracy(logits, labels))
 
         return loss
 
@@ -250,7 +252,8 @@ class ClientCNN(LightningModule):
         self.log("test_accuracy", accuracy)
 
     def configure_optimizers(self):
-        return torch.optim.AdamW(self.parameters(), lr=self.learning_rate)
+        return torch.optim.AdamW(self.parameters(), lr=self.learning_rate, weight_decay=1e-2)
+
 
 
 if __name__ == "__main__":
