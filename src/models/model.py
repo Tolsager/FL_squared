@@ -330,6 +330,12 @@ class SimpNet(LightningModule):
         return torch.optim.AdamW(self.parameters(), lr=self.learning_rate, weight_decay=1e-2)
 
 
+class SimSiam(LightningModule):
+    def __init__(self, feature_dim: int, pred_dim: int):
+        super().__init__()
+
+
+
 if __name__ == "__main__":
     Server = Server(5, 4)
     Server.train()
