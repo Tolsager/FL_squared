@@ -40,9 +40,10 @@ def trainbl(learning_rate: float, batch_size: int, seed: int, epochs: int):
     utils.seed_everything(seed)
 
     logger = WandbLogger(project="rep-in-fed", entity="pydqn",
-                         notes="simpnet baseline with augmentations, reduced dropout probabilities, groupnorm after all layers")
+                         notes="simpnet baseline with less augmentations, reduced dropout probabilities, groupnorm after all layers")
     transforms = process_data.get_cifar10_transforms()
 
+    # baseline = model.SimpNet(embedding_size=10, learning_rate=learning_rate)
     baseline = model.ClientCNN(learning_rate=learning_rate)
     train, test = model.make_dataset.load_dataset()
     train = process_data.AugmentedDataset(train, transforms)

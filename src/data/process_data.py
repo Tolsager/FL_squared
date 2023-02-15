@@ -130,12 +130,12 @@ def get_cifar10_transforms() -> torchvision.transforms.transforms.Compose:
             torchvision.transforms.RandomRotation(
                 10
             ),  # Rotates the image to a specified angel
-            torchvision.transforms.RandomAffine(
-                0, shear=10, scale=(0.8, 1.2)
-            ),  # Performs actions like zooms, change shear angles.
-            torchvision.transforms.ColorJitter(
-                brightness=0.2, contrast=0.2, saturation=0.2
-            ),  # Set the color params
+            # torchvision.transforms.RandomAffine(
+            #     0, shear=10, scale=(0.8, 1.2)
+            # ),  # Performs actions like zooms, change shear angles.
+            # torchvision.transforms.ColorJitter(
+            #     brightness=0.2, contrast=0.2, saturation=0.2
+            # ),  # Set the color params
         ]
     )
     return transforms
