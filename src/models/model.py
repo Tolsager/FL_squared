@@ -331,8 +331,38 @@ class SimpNet(LightningModule):
 
 
 class SimSiam(LightningModule):
-    def __init__(self, feature_dim: int, pred_dim: int):
+    def __init__(self, backbone: torch.nn.Module, predictor: torch.nn.Module, learning_rate, weight_decay):
         super().__init__()
+        # self.feature_dim = feature_dim
+        self.backbone = backbone
+        self.predictor = predictor
+        self.criterion = torch.nn.CosineSimilarity(dim=1)
+        self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
+
+    def forward(self, x1, x2):
+        z1 = self.backbone(x1)
+        z2 = self.backbone(x2)
+
+        prediction1 = self.predictor(z1)
+        prediction2 = self.predictor(z2)
+
+        return prediction1, prediction2, z1.detach(), z2.detach()
+    
+    def train_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int):
+        im1, im2, label = batch
+        prediction1, prediction2, z1, z2 = self(im1, im2)
+        loss = -0.5 * (self.criterion(prediction1, z2) + self.criterion(prediction2, z1))
+        self.log(loss)
+        return loss
+    
+    def configure_optimizers(self):
+        return torch.optim.AdamW(self.parameters, lr=self.lr, weight_decay=self.weight_decay)
+
+
+
+        
+
 
 
 

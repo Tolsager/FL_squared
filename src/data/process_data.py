@@ -1,6 +1,8 @@
 from collections.abc import Callable, Iterable
 from typing import Any, Tuple, Union
 
+from PIL import ImageFilter
+import random
 import numpy as np
 import torch
 import torchvision
@@ -121,6 +123,16 @@ class AugmentedDataset(torch.utils.data.Dataset):
         augmented_image = self.transforms(image)
         return augmented_image, label
 
+class SimSiamDataset(AugmentedDataset):
+    def __init__(self, dataset, transforms):
+        super().__init__(dataset, transforms)
+    
+    def __getitem__(self, i):
+        image, label = self.dataset[i]
+        aug1 = self.transforms(image)
+        aug2 = self.transforms(image)
+        return aug1, aug2, label
+
 
 def get_cifar10_transforms() -> torchvision.transforms.transforms.Compose:
     transforms = torchvision.transforms.Compose(
@@ -139,3 +151,28 @@ def get_cifar10_transforms() -> torchvision.transforms.transforms.Compose:
         ]
     )
     return transforms
+
+
+
+class GaussianBlur(object):
+    """Gaussian blur augmentation in SimCLR https://arxiv.org/abs/2002.05709"""
+
+    def __init__(self, sigma=[.1, 2.]):
+        self.sigma = sigma
+
+    def __call__(self, x):
+        sigma = random.uniform(self.sigma[0], self.sigma[1])
+        x = x.filter(ImageFilter.GaussianBlur(radius=sigma))
+        return x
+
+def get_sim_siam_transforms(img_size: Union(tuple[int, int], int)) -> torchvision.transforms.transforms.Compose:
+    augmentations = [
+        torchvision.transforms.RandomResizedCrop(img_size, scale=(0.2, 1.)),
+        torchvision.transforms.RandomApply([
+            torchvision.transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
+        ], p=0.8),
+        torchvision.transforms.RandomGrayscale(p=0.2),
+        torchvision.transforms.RandomApply([GaussianBlur([.1, 2.])], p=0.5),
+        torchvision.transforms.RandomHorizontalFlip(),
+    ]
+    return augmentations
