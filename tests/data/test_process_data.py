@@ -60,7 +60,7 @@ def test_val_test_split():
     dataset = torchvision.datasets.CIFAR10(
         root=save_path, train=False, transform=transforms, download=True
     )
-    ds_val, ds_test = train_val(dataset, 60, shuffle=True)
+    ds_val, ds_test = train_val_split(dataset, 60, shuffle=True)
 
     assert isinstance(ds_val, torch.utils.data.dataset.Subset)
     assert isinstance(ds_test, torch.utils.data.dataset.Subset)
