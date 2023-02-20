@@ -1,16 +1,17 @@
 from collections.abc import Callable, Iterable
-from typing import Any, Union, Tuple
+from typing import Any, Tuple, Union
 
 import numpy as np
 import torch
+import torchvision
 
 
 class DataSplitter:
     def __init__(
-            self,
-            dataset: torch.utils.data.Dataset,
-            n_clients: int,
-            shards_per_client: int = 2,
+        self,
+        dataset: torch.utils.data.Dataset,
+        n_clients: int,
+        shards_per_client: int = 2,
     ):
         self.dataset = dataset
         self.n_clients = n_clients
@@ -68,7 +69,7 @@ class DataSplitter:
 
 
 def sort_torch_dataset(
-        dataset: torch.utils.data.Dataset, sort_fn: Callable[[Iterable], Any]
+    dataset: torch.utils.data.Dataset, sort_fn: Callable[[Iterable], Any]
 ) -> torch.utils.data.Dataset:
     # sort the data by label
     sorted_ds = sorted(dataset, key=sort_fn)
@@ -80,8 +81,10 @@ def cifar10_sort_fn(batch: tuple[torch.Tensor]):
     return batch[1]
 
 
-def val_test_split(
-        dataset: torch.utils.data.Dataset, val_size: Union[int, float], shuffle: bool = False
+def train_val_split(
+    dataset: torch.utils.data.Dataset,
+    val_size: Union[int, float],
+    shuffle: bool = False,
 ) -> Tuple[torch.utils.data.dataset.Subset, torch.utils.data.dataset.Subset]:
 
     if shuffle:
@@ -96,7 +99,43 @@ def val_test_split(
         # calculate number of samples in the validation split
         n_val_samples = int(val_size * len(dataset))
         val_split = torch.utils.data.Subset(dataset, indices[:n_val_samples])
-        test_split = torch.utils.data.Subset(
-            dataset, indices[n_val_samples:]
-        )
+        test_split = torch.utils.data.Subset(dataset, indices[n_val_samples:])
     return val_split, test_split
+
+
+class AugmentedDataset(torch.utils.data.Dataset):
+    def __init__(
+        self,
+        dataset: torch.utils.data.Dataset,
+        transforms: torchvision.transforms.transforms.Compose,
+    ):
+        super().__init__()
+        self.dataset = dataset
+        self.transforms = transforms
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, i):
+        image, label = self.dataset[i]
+        augmented_image = self.transforms(image)
+        return augmented_image, label
+
+
+def get_cifar10_transforms() -> torchvision.transforms.transforms.Compose:
+    transforms = torchvision.transforms.Compose(
+        [
+            torchvision.transforms.RandomHorizontalFlip(),
+            # Flips the image w.r.t horizontal axis
+            torchvision.transforms.RandomRotation(
+                10
+            ),  # Rotates the image to a specified angel
+            # torchvision.transforms.RandomAffine(
+            #     0, shear=10, scale=(0.8, 1.2)
+            # ),  # Performs actions like zooms, change shear angles.
+            # torchvision.transforms.ColorJitter(
+            #     brightness=0.2, contrast=0.2, saturation=0.2
+            # ),  # Set the color params
+        ]
+    )
+    return transforms

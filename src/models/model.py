@@ -4,6 +4,7 @@ from typing import List, Tuple
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from pytorch_lightning import LightningModule, Trainer
 from torchmetrics import Accuracy
 
@@ -13,14 +14,14 @@ from src.data import make_dataset, process_data
 
 class Server:
     def __init__(
-        self,
-        n_clients: int,
-        shards_per_client: int = 2,
-        rounds: int = 2,
-        C: float = 0.1,
-        batch_size: int = 32,
-        n_samples: int = None,
-        E: int = 2,
+            self,
+            n_clients: int,
+            shards_per_client: int = 2,
+            rounds: int = 2,
+            C: float = 0.1,
+            batch_size: int = 32,
+            n_samples: int = None,
+            E: int = 2,
     ):
         self.n_clients = n_clients
         self.rounds = rounds
@@ -125,37 +126,187 @@ class ClientCNN(LightningModule):
         self.criterion = (
             nn.CrossEntropyLoss()
         )  # TODO: representation learning; contrastive loss
-        self.input = nn.Sequential(
+
+        self.model = self._make_model()
+
+    def _make_model(self):
+        model = nn.Sequential(
             nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, padding=1),
-            nn.ReLU(),
-        )
-        self.block = nn.Sequential(
+            nn.GroupNorm(2, 16),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.04),
+
             nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding=1),
-            nn.ReLU(),
+            nn.GroupNorm(4, 32),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.04),
+
             nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1),
-            nn.ReLU(),
+            nn.GroupNorm(4, 32),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.04),
+
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1),
+            nn.GroupNorm(8, 64),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.04),
+
             nn.MaxPool2d(2),
-        )
-        self.out = nn.Sequential(
+            nn.Dropout2d(p=0.06),
+
             nn.Flatten(),
-            nn.Linear(32 * 16 * 16, 256),
-            nn.ReLU(),
-            nn.Linear(256, 256),
-            nn.ReLU(),
-            nn.Linear(256, 10),
+            nn.Linear(64 * 16 * 16, 512),
+            nn.ReLU(inplace=True),
+            nn.Linear(512, 512),
+            nn.ReLU(inplace=True),
+            nn.Linear(512, 10),
         )
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.xavier_uniform_(
+                    m.weight.data, gain=nn.init.calculate_gain("relu")
+                )
+
+        return model
+
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.input(x)
-        x = self.block(x)
-        return self.out(x)
+        return self.model(x)
 
     def training_step(
-        self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
+            self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
+    ) -> torch.Tensor:
+        images, labels = batch
+        logits = self.model(images)
+        loss = self.criterion(logits, labels)
+        self.log("training_loss", loss)
+        self.log("training_accuracy", self.accuracy(logits, labels))
+
+        return loss
+
+    def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int):
+        images, labels = batch
+        logits = self.model(images)
+        loss = self.criterion(logits, labels)
+        accuracy = self.accuracy(logits, labels)
+        self.log("val_loss", loss)
+        self.log("val_accuracy", accuracy)
+
+    def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int):
+        images, labels = batch
+        logits = self(images)
+        loss = self.criterion(logits, labels)
+        accuracy = self.accuracy(logits, labels)
+        self.log("test_loss", loss)
+        self.log("test_accuracy", accuracy)
+
+    def configure_optimizers(self):
+        return torch.optim.AdamW(self.parameters(), lr=self.learning_rate, weight_decay=1e-2)
+
+
+class SimpNet(LightningModule):
+    def __init__(self, embedding_size: int, learning_rate: float):
+        super().__init__()
+
+        self.learning_rate = learning_rate
+        self.accuracy = Accuracy(task="multiclass", num_classes=10)
+
+        self.criterion = (
+            nn.CrossEntropyLoss()
+        )
+
+        self.features = self._make_layers()
+        self.fc = nn.Linear(432, embedding_size)
+
+    def forward(self, x):
+        out = self.features(x)
+
+        # Global Max Pooling
+        out = F.max_pool2d(out, kernel_size=out.size()[2:])
+        out = F.dropout2d(out, 0.02, training=True)
+
+        out = out.view(out.size(0), -1)
+        out = self.fc(out)
+        return out
+
+    def _make_layers(self) -> nn.Sequential:
+        model = nn.Sequential(
+            nn.Conv2d(3, 66, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            nn.GroupNorm(11, 66),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.01),
+            nn.Conv2d(66, 128, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            nn.GroupNorm(16, 128),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.02),
+            nn.Conv2d(128, 128, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            nn.GroupNorm(16, 128),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.02),
+            nn.Conv2d(128, 128, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            nn.GroupNorm(16, 128),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.02),
+            nn.Conv2d(128, 192, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            nn.GroupNorm(24, 192),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(
+                kernel_size=(2, 2), stride=(2, 2), dilation=(1, 1), ceil_mode=False
+            ),
+            nn.Dropout2d(p=0.04),
+            nn.Conv2d(192, 192, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            nn.GroupNorm(24, 192),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.02),
+            nn.Conv2d(192, 192, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            nn.GroupNorm(24, 192),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.02),
+            nn.Conv2d(192, 192, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            nn.GroupNorm(24, 192),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.025),
+            nn.Conv2d(192, 192, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            nn.GroupNorm(24, 192),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.025),
+            nn.Conv2d(192, 288, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            nn.GroupNorm(24, 288),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(
+                kernel_size=(2, 2), stride=(2, 2), dilation=(1, 1), ceil_mode=False
+            ),
+            nn.Dropout2d(p=0.04),
+            nn.Conv2d(288, 288, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            nn.GroupNorm(24, 288),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.03),
+            nn.Conv2d(288, 355, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            nn.GroupNorm(71, 355),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.03),
+            nn.Conv2d(355, 432, kernel_size=[3, 3], stride=(1, 1), padding=(1, 1)),
+            nn.GroupNorm(27, 432),
+            nn.ReLU(inplace=True),
+        )
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.xavier_uniform_(
+                    m.weight.data, gain=nn.init.calculate_gain("relu")
+                )
+
+        return model
+
+    def training_step(
+            self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
         images, labels = batch
         logits = self(images)
         loss = self.criterion(logits, labels)
+        self.log("training_loss", loss)
+        self.log("training_accuracy", self.accuracy(logits, labels))
 
         return loss
 
@@ -176,7 +327,7 @@ class ClientCNN(LightningModule):
         self.log("test_accuracy", accuracy)
 
     def configure_optimizers(self):
-        return torch.optim.AdamW(self.parameters(), lr=self.learning_rate)
+        return torch.optim.AdamW(self.parameters(), lr=self.learning_rate, weight_decay=1e-2)
 
 
 if __name__ == "__main__":
