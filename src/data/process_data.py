@@ -7,6 +7,11 @@ import torch
 import torchvision
 from PIL import ImageFilter
 
+cifar10_standard_transforms = [
+    torchvision.transforms.ToTensor(),
+    torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)),
+]
+
 
 class DataSplitter:
     def __init__(
@@ -125,7 +130,11 @@ class AugmentedDataset(torch.utils.data.Dataset):
 
 
 class SimSiamDataset(AugmentedDataset):
-    def __init__(self, dataset, transforms):
+    def __init__(
+        self,
+        dataset: torch.utils.data.Dataset,
+        transforms: torchvision.transforms.transforms.Compose,
+    ):
         super().__init__(dataset, transforms)
 
     def __getitem__(self, i):
@@ -140,16 +149,8 @@ def get_cifar10_transforms() -> torchvision.transforms.transforms.Compose:
         [
             torchvision.transforms.RandomHorizontalFlip(),
             # Flips the image w.r.t horizontal axis
-            torchvision.transforms.RandomRotation(
-                10
-            ),  # Rotates the image to a specified angel
-            # torchvision.transforms.RandomAffine(
-            #     0, shear=10, scale=(0.8, 1.2)
-            # ),  # Performs actions like zooms, change shear angles.
-            # torchvision.transforms.ColorJitter(
-            #     brightness=0.2, contrast=0.2, saturation=0.2
-            # ),  # Set the color params
-        ]
+            torchvision.transforms.RandomRotation(10),
+        ].extend(cifar10_standard_transforms)
     )
     return transforms
 
@@ -166,7 +167,7 @@ class GaussianBlur(object):
         return x
 
 
-def get_sim_siam_transforms(
+def get_simsiam_transforms(
     img_size: Union[tuple[int, int], int]
 ) -> torchvision.transforms.transforms.Compose:
     augmentations = [
@@ -183,4 +184,5 @@ def get_sim_siam_transforms(
         torchvision.transforms.RandomApply([GaussianBlur([0.1, 2.0])], p=0.5),
         torchvision.transforms.RandomHorizontalFlip(),
     ]
-    return augmentations
+    augmentations.extend(cifar10_standard_transforms)
+    return torchvision.transforms.transforms.Compose(augmentations)

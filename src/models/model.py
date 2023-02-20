@@ -14,14 +14,14 @@ from src.data import make_dataset, process_data
 
 class Server:
     def __init__(
-            self,
-            n_clients: int,
-            shards_per_client: int = 2,
-            rounds: int = 2,
-            C: float = 0.1,
-            batch_size: int = 32,
-            n_samples: int = None,
-            E: int = 2,
+        self,
+        n_clients: int,
+        shards_per_client: int = 2,
+        rounds: int = 2,
+        C: float = 0.1,
+        batch_size: int = 32,
+        n_samples: int = None,
+        E: int = 2,
     ):
         self.n_clients = n_clients
         self.rounds = rounds
@@ -135,25 +135,20 @@ class ClientCNN(LightningModule):
             nn.GroupNorm(2, 16),
             nn.ReLU(inplace=True),
             nn.Dropout2d(p=0.04),
-
             nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding=1),
             nn.GroupNorm(4, 32),
             nn.ReLU(inplace=True),
             nn.Dropout2d(p=0.04),
-
             nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1),
             nn.GroupNorm(4, 32),
             nn.ReLU(inplace=True),
             nn.Dropout2d(p=0.04),
-
             nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1),
             nn.GroupNorm(8, 64),
             nn.ReLU(inplace=True),
             nn.Dropout2d(p=0.04),
-
             nn.MaxPool2d(2),
             nn.Dropout2d(p=0.06),
-
             nn.Flatten(),
             nn.Linear(64 * 16 * 16, 512),
             nn.ReLU(inplace=True),
@@ -170,12 +165,11 @@ class ClientCNN(LightningModule):
 
         return model
 
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
 
     def training_step(
-            self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
+        self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
         images, labels = batch
         logits = self.model(images)
@@ -202,19 +196,19 @@ class ClientCNN(LightningModule):
         self.log("test_accuracy", accuracy)
 
     def configure_optimizers(self):
-        return torch.optim.AdamW(self.parameters(), lr=self.learning_rate, weight_decay=1e-2)
+        return torch.optim.AdamW(
+            self.parameters(), lr=self.learning_rate, weight_decay=1e-2
+        )
 
 
 class SimpNet(LightningModule):
-    def __init__(self, embedding_size: int, learning_rate: float):
+    def __init__(self, embedding_size: int, learning_rate: float = 3e-5):
         super().__init__()
 
         self.learning_rate = learning_rate
         self.accuracy = Accuracy(task="multiclass", num_classes=10)
 
-        self.criterion = (
-            nn.CrossEntropyLoss()
-        )
+        self.criterion = nn.CrossEntropyLoss()
 
         self.features = self._make_layers()
         self.fc = nn.Linear(432, embedding_size)
@@ -300,13 +294,13 @@ class SimpNet(LightningModule):
         return model
 
     def training_step(
-            self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
+        self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
         images, labels = batch
         logits = self(images)
         loss = self.criterion(logits, labels)
-        self.log("training_loss", loss)
-        self.log("training_accuracy", self.accuracy(logits, labels))
+        self.log("train_loss", loss)
+        self.log("train_accuracy", self.accuracy(logits, labels))
 
         return loss
 
@@ -327,11 +321,19 @@ class SimpNet(LightningModule):
         self.log("test_accuracy", accuracy)
 
     def configure_optimizers(self):
-        return torch.optim.AdamW(self.parameters(), lr=self.learning_rate, weight_decay=1e-2)
+        return torch.optim.AdamW(
+            self.parameters(), lr=self.learning_rate, weight_decay=1e-2
+        )
 
 
 class SimSiam(LightningModule):
-    def __init__(self, backbone: torch.nn.Module, predictor: torch.nn.Module, learning_rate, weight_decay):
+    def __init__(
+        self,
+        backbone: torch.nn.Module,
+        predictor: torch.nn.Module,
+        learning_rate: float = 0.001,
+        weight_decay: float = 0.01,
+    ):
         super().__init__()
         # self.feature_dim = feature_dim
         self.backbone = backbone
@@ -348,24 +350,36 @@ class SimSiam(LightningModule):
         prediction2 = self.predictor(z2)
 
         return prediction1, prediction2, z1.detach(), z2.detach()
-    
-    def train_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int):
+
+    def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int):
         im1, im2, label = batch
         prediction1, prediction2, z1, z2 = self(im1, im2)
-        loss = -0.5 * (self.criterion(prediction1, z2) + self.criterion(prediction2, z1))
-        self.log(loss)
+        loss = -0.5 * (
+            self.criterion(prediction1, z2).mean()
+            + self.criterion(prediction2, z1).mean()
+        )
+        self.log("train_loss", loss)
         return loss
-    
+
+    def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int):
+        im1, im2, label = batch
+        prediction1, prediction2, z1, z2 = self(im1, im2)
+        loss = -0.5 * (
+            self.criterion(prediction1, z2).mean()
+            + self.criterion(prediction2, z1).mean()
+        )
+        self.log("val_loss", loss)
+
     def configure_optimizers(self):
-        return torch.optim.AdamW(self.parameters, lr=self.lr, weight_decay=self.weight_decay)
+        return torch.optim.AdamW(
+            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
+        )
 
 
-
-        
-
-
-
-
-if __name__ == "__main__":
-    Server = Server(5, 4)
-    Server.train()
+def get_simsiam_predictor(embedding_dim: int = 432, hidden_dim: int = 200):
+    predictor = torch.nn.Sequential(
+        torch.nn.Linear(embedding_dim, hidden_dim),
+        torch.nn.ReLU(),
+        torch.nn.Linear(hidden_dim, embedding_dim),
+    )
+    return predictor
