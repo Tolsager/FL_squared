@@ -9,7 +9,7 @@ from src.data.process_data import (
     DataSplitter,
     cifar10_sort_fn,
     sort_torch_dataset,
-    train_val,
+    train_val_split,
 )
 
 save_path = "data/raw"

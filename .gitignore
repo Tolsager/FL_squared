@@ -1,6 +1,7 @@
 # Our ignores
 lightning_logs
 wandb
+rep-in-fed
 
 
 # Byte-compiled / optimized / DLL files
