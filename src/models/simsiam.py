@@ -6,7 +6,8 @@ import torch
 
 from pytorch_lightning import LightningModule
 from pl_bolts.models.self_supervised.simsiam.simsiam_module import SimSiam
-
+from sklearn.linear_model import LogisticRegression
+from sklearn.utils.validation import check_is_fitted
 
 class SimSiamModel(SimSiam):
     def __init__(self, **kwargs):
@@ -26,9 +27,9 @@ class SimSiamModel(SimSiam):
 
         # Log loss
         if step == "train":
-            self.log({"train_loss_12": loss_12, "train_loss_21": loss_21, "train_loss": total_loss})
+            self.log_dict({"train_loss_12": loss_12, "train_loss_21": loss_21, "train_loss": total_loss})
         elif step == "val":
-            self.log({"val_loss_12": loss_12, "val_loss_21": loss_21, "val_loss": total_loss})
+            self.log_dict({"val_loss_12": loss_12, "val_loss_21": loss_21, "val_loss": total_loss})
         else:
             raise ValueError(f"Step '{step}' is invalid. Must be 'train' or 'val'.")
 
@@ -141,6 +142,8 @@ class OurSimSiam(LightningModule):
         self.criterion = torch.nn.CosineSimilarity(dim=1)
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
+        self.lr = LogisticRegression()
+        self.fitted = False
 
     def forward(self, x1, x2):
         z1 = self.backbone(x1)
@@ -159,16 +162,41 @@ class OurSimSiam(LightningModule):
             + self.criterion(prediction2, z1).mean()
         )
         self.log("train_loss", loss)
-        return loss
+        return {"loss": loss, "prediction": prediction1, "label": label}
 
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int):
-        im1, im2, label = batch
-        prediction1, prediction2, z1, z2 = self(im1, im2)
-        loss = -0.5 * (
-            self.criterion(prediction1, z2).mean()
-            + self.criterion(prediction2, z1).mean()
-        )
-        self.log("val_loss", loss)
+        im, label = batch
+        prediction = self.backbone(im)
+        return {"prediction": prediction, "label": label}
+
+    def training_epoch_end(self, training_step_outputs: list[tuple]):
+        predictions = [i["prediction"] for i in training_step_outputs]
+        labels = [i["label"] for i in training_step_outputs]
+
+        predictions = torch.concat(predictions, dim=0)
+        labels = torch.concat(labels, dim=0)
+
+        predictions = predictions.detach().numpy()
+        labels = labels.detach().numpy()
+
+        self.lr.fit(predictions, labels)
+        self.fitted = True
+
+    def validation_epoch_end(self, validation_step_outputs: list[tuple]):
+        if self.fitted:
+            predictions = [i["prediction"] for i in validation_step_outputs]
+            labels = [i["label"] for i in validation_step_outputs]
+
+            predictions = torch.concat(predictions, dim=0)
+            labels = torch.concat(labels, dim=0)
+
+            predictions = predictions.numpy()
+            labels = labels.numpy()
+
+            acc = self.lr.score(predictions, labels)
+            self.log("val_acc", acc)
+
+
 
     def configure_optimizers(self):
         return torch.optim.AdamW(

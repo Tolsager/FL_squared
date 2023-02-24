@@ -1,11 +1,12 @@
 # import os
+import torchvision
 
 import click
 import torch
 from dotenv import find_dotenv, load_dotenv
+from pl_bolts.callbacks.ssl_online import SSLOnlineEvaluator
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
-from pl_bolts.models.self_supervised.simsiam.simsiam_module import SimSiam
 
 import wandb
 from src import utils
@@ -13,6 +14,8 @@ from src.data import process_data
 from src.models import model, simsiam
 
 load_dotenv(find_dotenv())
+
+GPU = torch.cuda.is_available()
 
 
 @click.group()
@@ -51,9 +54,9 @@ def train_bl(learning_rate: float, batch_size: int, seed: int, epochs: int):
     # baseline = model.SimpNet(embedding_size=10, learning_rate=learning_rate)
     baseline = model.ClientCNN(learning_rate=learning_rate)
     train, test = model.make_dataset.load_dataset()
+    train, val = process_data.train_val_split(test, 0.2)
     train = process_data.AugmentedDataset(train, transforms)
     trainloader_bl = torch.utils.data.DataLoader(train, batch_size=batch_size)
-    train, val = process_data.train_val_split(test, 0.2)
     valloader_bl = torch.utils.data.DataLoader(val, batch_size=batch_size)
     trainer = Trainer(accelerator="gpu", gpus=1, max_epochs=epochs, logger=logger)
     trainer.fit(baseline, trainloader_bl, valloader_bl)
@@ -65,23 +68,34 @@ def train_bl(learning_rate: float, batch_size: int, seed: int, epochs: int):
 @click.option("--seed", type=int, default=0)
 @click.option("--epochs", type=int, default=2)
 @click.option("--embedding-size", type=int, default=2048)
-def train_simsiam(learning_rate, batch_size, seed, epochs, embedding_size):
+@click.option("--pl-bolts", is_flag=True)
+@click.option("--debug", is_flag=True)
+def train_simsiam(learning_rate: float, batch_size: int, seed: int, epochs: int, embedding_size: int, pl_bolts: bool,
+                  debug: bool):
     utils.seed_everything(seed)
-    tags = ["representation_learning", "baseline", "simsiam"]
+    tags = ["representation_learning", "baseline", "simsiam", f"{embedding_size}"]
 
-    logger = WandbLogger(project="rep-in-fed", entity="pydqn", tags=tags)
+    if not debug:
+        logger = WandbLogger(project="rep-in-fed", entity="pydqn", tags=tags)
 
-    encoder = simsiam.SimpNetEncoder(embedding_size=embedding_size)
+    if pl_bolts:
+        simsiam_model = simsiam.SimSiamModel(max_epochs=epochs)
+    else:
+        predictor = simsiam.get_simsiam_predictor(embedding_dim=embedding_size)
+        simsiam_model = simsiam.OurSimSiam(
+            backbone=model.SimpNet(embedding_size=embedding_size, learning_rate=learning_rate),
+            predictor=predictor)
 
-    simsiam_model = simsiam.SimSiamModel(base_encoder=encoder, encoder_out_dim=embedding_size, max_epochs=epochs)
     train, test = model.make_dataset.load_dataset()
 
     transforms = process_data.get_simsiam_transforms(img_size=32)
-    train = process_data.SimSiamDataset(train, transforms)
     train, val = process_data.train_val_split(train, 0.2)
+    val = process_data.AugmentedDataset(val, torchvision.transforms.transforms.Compose(process_data.cifar10_standard_transforms))
+    train = process_data.SimSiamDataset(train, transforms)
     trainloader_bl = torch.utils.data.DataLoader(train, batch_size=batch_size)
     valloader_bl = torch.utils.data.DataLoader(val, batch_size=batch_size)
-    trainer = Trainer(accelerator="gpu", gpus=1, max_epochs=epochs, logger=logger)
+    trainer = Trainer(accelerator="gpu", gpus=1, max_epochs=epochs, logger=logger) if GPU else Trainer(
+        max_epochs=epochs, logger=logger, fast_dev_run=True)
     trainer.fit(simsiam_model, trainloader_bl, valloader_bl)
 
 
