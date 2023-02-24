@@ -5,11 +5,12 @@ import torch
 from dotenv import find_dotenv, load_dotenv
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
+from pl_bolts.models.self_supervised.simsiam.simsiam_module import SimSiam
 
 import wandb
 from src import utils
 from src.data import process_data
-from src.models import model
+from src.models import model, simsiam
 
 load_dotenv(find_dotenv())
 
@@ -31,12 +32,12 @@ def train_fl(config_file: str):
     server.train()
 
 
-@click.command()
+@click.command(name="baseline")
 @click.option("--learning-rate", type=float, default=0.001)
 @click.option("--batch-size", type=int, default=16)
 @click.option("--seed", type=int, default=0)
 @click.option("--epochs", type=int, default=5)
-def trainbl(learning_rate: float, batch_size: int, seed: int, epochs: int):
+def train_bl(learning_rate: float, batch_size: int, seed: int, epochs: int):
     utils.seed_everything(seed)
 
     logger = WandbLogger(
@@ -60,20 +61,19 @@ def trainbl(learning_rate: float, batch_size: int, seed: int, epochs: int):
 
 @click.command(name="simsiam")
 @click.option("--learning-rate", type=float, default=0.001)
-@click.option("--batch-size", type=int, default=16)
+@click.option("--batch-size", type=int, default=32)
 @click.option("--seed", type=int, default=0)
 @click.option("--epochs", type=int, default=2)
-@click.option("--embedding-size", type=int, default=432)
+@click.option("--embedding-size", type=int, default=2048)
 def train_simsiam(learning_rate, batch_size, seed, epochs, embedding_size):
     utils.seed_everything(seed)
     tags = ["representation_learning", "baseline", "simsiam"]
 
     logger = WandbLogger(project="rep-in-fed", entity="pydqn", tags=tags)
 
-    predictor = model.get_simsiam_predictor()
-    backbone = model.SimpNet(embedding_size=embedding_size)
+    encoder = simsiam.SimpNetEncoder(embedding_size=embedding_size)
 
-    simsiam_model = model.SimSiam(backbone=backbone, predictor=predictor)
+    simsiam_model = simsiam.SimSiamModel(base_encoder=encoder, encoder_out_dim=embedding_size, max_epochs=epochs)
     train, test = model.make_dataset.load_dataset()
 
     transforms = process_data.get_simsiam_transforms(img_size=32)
@@ -86,7 +86,7 @@ def train_simsiam(learning_rate, batch_size, seed, epochs, embedding_size):
 
 
 cli.add_command(train_fl)
-cli.add_command(trainbl)
+cli.add_command(train_bl)
 cli.add_command(train_simsiam)
 
 if __name__ == "__main__":
