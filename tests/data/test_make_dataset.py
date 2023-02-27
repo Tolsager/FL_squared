@@ -1,5 +1,6 @@
 import os
 
+import PIL
 import pytest
 import torch
 
@@ -25,10 +26,10 @@ class TestData:
 
     def test_shape(self):
         train, test = make_dataset.load_dataset()
-        assert train[0][0].shape == torch.Size([3, 32, 32])
-        assert test[0][0].shape == torch.Size([3, 32, 32])
+        assert train[0][0].size == (32, 32)
+        assert test[0][0].size == (32, 32)
 
     def test_type(self):
         train, test = make_dataset.load_dataset()
-        assert train[0][0].dtype == torch.float32
-        assert test[0][0].dtype == torch.float32
+        assert isinstance(train[0][0], PIL.Image.Image)
+        assert isinstance(train[0][0], PIL.Image.Image)
