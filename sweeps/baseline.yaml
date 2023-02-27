@@ -1,0 +1,20 @@
+program: src/models/train_model.py
+method: grid
+metric:
+  name: val_loss
+  goal: minimize
+parameters:
+  learning_rate:
+    values: [0.01, 0.001, 0.005, 0.0075]
+  batch_size:
+    value: 10
+  seed:
+    value: 1
+  epochs:
+    value: 1
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - trainbl
+  - ${args}
