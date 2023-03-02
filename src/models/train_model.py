@@ -108,15 +108,16 @@ def train_simsiam(learning_rate: float, batch_size: int, seed: int, epochs: int,
 def train_imagenet(learning_rate: float, batch_size: int, seed: int, epochs: int, embedding_size: int, arch: str):
     utils.seed_everything(seed)
 
-    tags = ["supervised_learning", f"{model}", "imagenet"]
+    tags = ["supervised_learning", f"{arch}", "imagenet"]
 
     logger = WandbLogger(project="rep-in-fed", entity="pydqn", tags=tags)
     if arch == "simpnet":
         simpnet_model = model.SimpNet(embedding_size, learning_rate=learning_rate)
 
-    train, test = model.make_dataset.load_dataset(dataset="imagenet")
+    train = torchvision.datasets.ImageFolder("data/raw/imagenet/train", transform=process_data.imagenet_standard_transforms)
+    val = torchvision.datasets.ImageFolder("data/raw/imagenet/val", transform=process_data.imagenet_standard_transforms)
     trainloader = torch.utils.data.DataLoader(train, batch_size=batch_size)
-    valloader = torch.utils.data.DataLoader(test, batch_size=batch_size)
+    valloader = torch.utils.data.DataLoader(val, batch_size=batch_size)
 
     trainer = Trainer(accelerator="gpu", gpus=1, max_epochs=epochs, logger=logger) # Not feasible to use a non GPU machine to train
     trainer.fit(simpnet_model, trainloader, valloader)
