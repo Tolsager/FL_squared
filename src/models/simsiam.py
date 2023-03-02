@@ -5,35 +5,15 @@ import torch.nn.functional as F
 import torch
 
 from pytorch_lightning import LightningModule
-from pl_bolts.models.self_supervised.simsiam.simsiam_module import SimSiam
 from sklearn.linear_model import LogisticRegression
 from sklearn.utils.validation import check_is_fitted
 
+class SimSiam:
+    pass
+
 class SimSiamModel(SimSiam):
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def _shared_step(self, batch: Any, batch_idx: int, step: str) -> torch.Tensor:
-        """Shared evaluation step for training and validation loops."""
-        imgs = batch
-        img1, img2 = imgs[:2]
-
-        # Calculate similarity loss in each direction
-        loss_12 = self.calculate_loss(img1, img2)
-        loss_21 = self.calculate_loss(img2, img1)
-
-        # Calculate total loss
-        total_loss = loss_12 + loss_21
-
-        # Log loss
-        if step == "train":
-            self.log_dict({"train_loss_12": loss_12, "train_loss_21": loss_21, "train_loss": total_loss})
-        elif step == "val":
-            self.log_dict({"val_loss_12": loss_12, "val_loss_21": loss_21, "val_loss": total_loss})
-        else:
-            raise ValueError(f"Step '{step}' is invalid. Must be 'train' or 'val'.")
-
-        return total_loss
+        pass
 
 
 class SimpNetEncoder(nn.Module):
