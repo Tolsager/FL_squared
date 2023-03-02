@@ -4,7 +4,6 @@ import torchvision
 import click
 import torch
 from dotenv import find_dotenv, load_dotenv
-from pl_bolts.callbacks.ssl_online import SSLOnlineEvaluator
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
 
@@ -99,9 +98,34 @@ def train_simsiam(learning_rate: float, batch_size: int, seed: int, epochs: int,
     trainer.fit(simsiam_model, trainloader_bl, valloader_bl)
 
 
+@click.command(name="imagenet")
+@click.option("--learning-rate", type=float, default=0.001)
+@click.option("--batch-size", type=int, default=32)
+@click.option("-seed", type=int, default=0)
+@click.option("--epochs", type=int, default=2)
+@click.option("--embedding-size", type=int, default=1000)
+@click.option("--arch", type=str, default="simpnet")
+def train_imagenet(learning_rate: float, batch_size: int, seed: int, epochs: int, embedding_size: int, arch: str):
+    utils.seed_everything(seed)
+
+    tags = ["supervised_learning", f"{model}", "imagenet"]
+
+    logger = WandbLogger(project="rep-in-fed", entity="pydqn", tags=tags)
+    if arch == "simpnet":
+        simpnet_model = model.SimpNet(embedding_size, learning_rate=learning_rate)
+
+    train, test = model.make_dataset.load_dataset(dataset="imagenet")
+    trainloader = torch.utils.data.DataLoader(train, batch_size=batch_size)
+    valloader = torch.utils.data.DataLoader(test, batch_size=batch_size)
+
+    trainer = Trainer(accelerator="gpu", gpus=1, max_epochs=epochs, logger=logger) # Not feasible to use a non GPU machine to train
+    trainer.fit(simpnet_model, trainloader, valloader)
+
+
 cli.add_command(train_fl)
 cli.add_command(train_bl)
 cli.add_command(train_simsiam)
+cli.add_command(train_imagenet)
 
 if __name__ == "__main__":
     cli()
