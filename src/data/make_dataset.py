@@ -1,29 +1,47 @@
 # -*- coding: utf-8 -*-
+import gzip
+import shutil
 import logging
 import os
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Optional
 
+import urllib.request
 import click
 import torch
 import torchvision
 from dotenv import find_dotenv, load_dotenv
 
+downloadable_datasets = {"cifar10"}
 
-def download_dataset(save_path: str = "data/raw") -> None:
-    """Download the CIFAR10 dataset and apply tensor conversion."""
-    # TODO: Determine whether or not to normalize based on entire population,
-    # since clients will not have the full set.
-    os.makedirs(save_path, exist_ok=True)
-    train = torchvision.datasets.CIFAR10(root=save_path, train=True, download=True)
-    test = torchvision.datasets.CIFAR10(root=save_path, train=False, download=True)
+def download_dataset(save_path: str = "data/raw", dataset: str = "cifar10") -> None:
+    """downloads dataset
 
-    torch.save(train, "data/raw/train.pt")
-    torch.save(test, "data/raw/test.pt")
+    Args:
+        save_path (str, optional): directory to store datasets in. Defaults to "data/raw".
+        dataset (str, optional): name of the dataset. Defaults to "cifar10".
+
+    Raises:
+        ValueError: dataset is not implemented
+    """
+    if dataset not in downloadable_datasets:
+        raise ValueError(f"{dataset} is not implemented yet.\nAvailable datasets: {downloadable_datasets}")
+    save_dir = os.path.join(save_path, dataset)
+    os.makedirs(save_dir, exist_ok=True)
+
+    if dataset == "cifar10":
+        train = torchvision.datasets.CIFAR10(root=save_path, train=True, download=True)
+        test = torchvision.datasets.CIFAR10(root=save_path, train=False, download=True)
+
+        train = torchvision.datasets.ImageNet(root=save_dir, train=True, download=True)
+        test = torchvision.datasets.ImageNet(root=save_dir, train=False, download=True)
+
+    torch.save(train, f"{save_dir}/train.pt")
+    torch.save(test, f"{save_dir}/test.pt")
 
 
 def load_dataset(
-    load_path: str = "data/raw", n_samples: int = None
+    load_path: str = "data/raw", n_samples: Optional[int] = None
 ) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
     train = torch.load(os.path.join(load_path, "train.pt"))
     test = torch.load(os.path.join(load_path, "test.pt"))
