@@ -115,6 +115,7 @@ def train_imagenet(learning_rate: float, batch_size: int, seed: int, epochs: int
         simpnet_model = model.SimpNet(embedding_size, learning_rate=learning_rate)
 
     train = torchvision.datasets.ImageFolder("data/raw/imagenet/train", transform=torchvision.transforms.Compose(process_data.imagenet_standard_transforms))
+    train = process_data.shuffle_dataset(train)
     val = torchvision.datasets.ImageFolder("data/raw/imagenet/val", transform=torchvision.transforms.Compose(process_data.imagenet_standard_transforms))
     trainloader = torch.utils.data.DataLoader(train, batch_size=batch_size)
     valloader = torch.utils.data.DataLoader(val, batch_size=batch_size)
