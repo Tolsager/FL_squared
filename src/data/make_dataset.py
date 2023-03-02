@@ -23,10 +23,34 @@ def download_dataset(save_path: str = "data/raw") -> None:
 
 
 def load_dataset(
-    load_path: str = "data/raw", n_samples: int = None
+        load_path: str = "data/raw", n_samples: int = None, dataset: str = "cifar10"
 ) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
-    train = torch.load(os.path.join(load_path, "train.pt"))
-    test = torch.load(os.path.join(load_path, "test.pt"))
+    if dataset not in ("cifar10", "imagenet"):
+        raise ValueError(f"{dataset} is not supported must be 'cifar10' or 'imagenet'")
+
+    train_dir = os.path.join(load_path, dataset, "train.pt")
+    test_dir = os.path.join(load_path, dataset, "test.pt")
+
+    if dataset == "imagenet":
+        normalization = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        train_transform = torchvision.transforms.Compose([
+            torchvision.transforms.RandomHorizontalFlip(),
+            torchvision.transforms.ToTensor(),
+            normalization,
+        ])
+
+        test_transform = torchvision.transforms.Compose([
+            torchvision.transforms.RandomHorizontalFlip(),
+            torchvision.transforms.ToTensor(),
+            normalization,
+        ])
+
+        train = train_transform(torch.load(train_dir))
+        test = test_transform(torch.load(test_dir))
+
+    else:
+        train = torch.load(train_dir)
+        test = torch.load(test_dir)
 
     if n_samples is not None:
         train = torch.utils.data.Subset(train, range(n_samples))
