@@ -1,15 +1,15 @@
-from typing import Any, Tuple
+from typing import Tuple
 
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch
-
 from pytorch_lightning import LightningModule
-from sklearn.linear_model import LogisticRegression
-from sklearn.utils.validation import check_is_fitted
+from sklearn.neighbors import KNeighborsClassifier
+
 
 class SimSiam:
     pass
+
 
 class SimSiamModel(SimSiam):
     def __init__(self, **kwargs):
@@ -114,6 +114,7 @@ class OurSimSiam(LightningModule):
         predictor: torch.nn.Module,
         learning_rate: float = 0.001,
         weight_decay: float = 0.01,
+        max_epochs: int = 100,
     ):
         super().__init__()
         # self.feature_dim = feature_dim
@@ -122,8 +123,7 @@ class OurSimSiam(LightningModule):
         self.criterion = torch.nn.CosineSimilarity(dim=1)
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
-        self.lr = LogisticRegression()
-        self.fitted = False
+        self.max_epochs = max_epochs
 
     def forward(self, x1, x2):
         z1 = self.backbone(x1)
@@ -141,7 +141,7 @@ class OurSimSiam(LightningModule):
             self.criterion(prediction1, z2).mean()
             + self.criterion(prediction2, z1).mean()
         )
-        self.log("train_loss", loss)
+        self.log("train_loss", loss, on_epoch=True)
         return {"loss": loss, "prediction": prediction1, "label": label}
 
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int):
@@ -159,34 +159,51 @@ class OurSimSiam(LightningModule):
         predictions = predictions.detach().numpy()
         labels = labels.detach().numpy()
 
-        self.lr.fit(predictions, labels)
-        self.fitted = True
+        knn = KNeighborsClassifier()
+        knn.fit(predictions, labels)
+
+        val_acc = knn.score(self.val_predictions, self.val_labels)
+
+        self.log("val_acc", val_acc)
+
+        # self.lr.fit(predictions, labels)
 
     def validation_epoch_end(self, validation_step_outputs: list[tuple]):
-        if self.fitted:
-            predictions = [i["prediction"] for i in validation_step_outputs]
-            labels = [i["label"] for i in validation_step_outputs]
+        predictions = [i["prediction"] for i in validation_step_outputs]
+        labels = [i["label"] for i in validation_step_outputs]
 
-            predictions = torch.concat(predictions, dim=0)
-            labels = torch.concat(labels, dim=0)
+        predictions = torch.concat(predictions, dim=0)
+        labels = torch.concat(labels, dim=0)
 
-            predictions = predictions.numpy()
-            labels = labels.numpy()
+        predictions = predictions.numpy()
+        labels = labels.numpy()
 
-            acc = self.lr.score(predictions, labels)
-            self.log("val_acc", acc)
-
-
+        self.val_predictions = predictions
+        self.val_labels = labels
 
     def configure_optimizers(self):
-        return torch.optim.AdamW(
-            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
+        # return torch.optim.AdamW(
+        #     self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
+        # )
+        optimizer = torch.optim.SGD(
+            self.parameters(),
+            lr=self.learning_rate,
+            weight_decay=self.weight_decay,
+            momentum=0.9,
         )
+
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, self.max_epochs
+            ),
+        }
 
 
 def get_simsiam_predictor(embedding_dim: int = 432, hidden_dim: int = 200):
     predictor = torch.nn.Sequential(
-        torch.nn.Linear(embedding_dim, hidden_dim),
+        torch.nn.Linear(embedding_dim, hidden_dim, bias=False),
+        torch.nn.BatchNorm1d(hidden_dim),
         torch.nn.ReLU(),
         torch.nn.Linear(hidden_dim, embedding_dim),
     )

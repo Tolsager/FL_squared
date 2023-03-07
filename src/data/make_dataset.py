@@ -1,12 +1,9 @@
 # -*- coding: utf-8 -*-
-import gzip
-import shutil
 import logging
 import os
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Tuple
 
-import urllib.request
 import click
 import torch
 import torchvision
@@ -14,18 +11,23 @@ from dotenv import find_dotenv, load_dotenv
 
 downloadable_datasets = {"cifar10"}
 
+
 def download_dataset(save_path: str = "data/raw", dataset: str = "cifar10") -> None:
     """downloads dataset
 
     Args:
-        save_path (str, optional): directory to store datasets in. Defaults to "data/raw".
+        save_path (str, optional): directory to store datasets in. Defaults
+            to "data/raw".
         dataset (str, optional): name of the dataset. Defaults to "cifar10".
 
     Raises:
         ValueError: dataset is not implemented
     """
     if dataset not in downloadable_datasets:
-        raise ValueError(f"{dataset} is not implemented yet.\nAvailable datasets: {downloadable_datasets}")
+        raise ValueError(
+            f"{dataset} is not implemented yet.\n\
+            Available datasets: {downloadable_datasets}"
+        )
     save_dir = os.path.join(save_path, dataset)
     os.makedirs(save_dir, exist_ok=True)
 
@@ -33,15 +35,12 @@ def download_dataset(save_path: str = "data/raw", dataset: str = "cifar10") -> N
         train = torchvision.datasets.CIFAR10(root=save_path, train=True, download=True)
         test = torchvision.datasets.CIFAR10(root=save_path, train=False, download=True)
 
-        train = torchvision.datasets.ImageNet(root=save_dir, train=True, download=True)
-        test = torchvision.datasets.ImageNet(root=save_dir, train=False, download=True)
-
     torch.save(train, f"{save_dir}/train.pt")
     torch.save(test, f"{save_dir}/test.pt")
 
 
 def load_dataset(
-        load_path: str = "data/raw", n_samples: int = None, dataset: str = "cifar10"
+    load_path: str = "data/raw", n_samples: int = None, dataset: str = "cifar10"
 ) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
     if dataset not in ("cifar10", "imagenet"):
         raise ValueError(f"{dataset} is not supported must be 'cifar10' or 'imagenet'")
@@ -50,18 +49,24 @@ def load_dataset(
     test_dir = os.path.join(load_path, dataset, "test.pt")
 
     if dataset == "imagenet":
-        normalization = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        train_transform = torchvision.transforms.Compose([
-            torchvision.transforms.RandomHorizontalFlip(),
-            torchvision.transforms.ToTensor(),
-            normalization,
-        ])
+        normalization = torchvision.transforms.Normalize(
+            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+        )
+        train_transform = torchvision.transforms.Compose(
+            [
+                torchvision.transforms.RandomHorizontalFlip(),
+                torchvision.transforms.ToTensor(),
+                normalization,
+            ]
+        )
 
-        test_transform = torchvision.transforms.Compose([
-            torchvision.transforms.RandomHorizontalFlip(),
-            torchvision.transforms.ToTensor(),
-            normalization,
-        ])
+        test_transform = torchvision.transforms.Compose(
+            [
+                torchvision.transforms.RandomHorizontalFlip(),
+                torchvision.transforms.ToTensor(),
+                normalization,
+            ]
+        )
 
         train = train_transform(torch.load(train_dir))
         test = test_transform(torch.load(test_dir))
