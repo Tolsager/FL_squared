@@ -206,7 +206,7 @@ class SimpNet(LightningModule):
         super().__init__()
 
         self.learning_rate = learning_rate
-        self.accuracy = Accuracy(task="multiclass", num_classes=10)
+        self.accuracy = Accuracy(task="multiclass", num_classes=embedding_size)
 
         self.criterion = nn.CrossEntropyLoss()
 

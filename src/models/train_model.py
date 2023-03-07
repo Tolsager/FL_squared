@@ -191,6 +191,7 @@ def train_imagenet(
             process_data.imagenet_standard_transforms
         ),
     )
+    train = process_data.shuffle_dataset(train)
     val = torchvision.datasets.ImageFolder(
         "data/raw/imagenet/val",
         transform=torchvision.transforms.Compose(
