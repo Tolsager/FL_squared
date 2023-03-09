@@ -88,7 +88,7 @@ def train_simsiam(
                 backbones are: f{backbones}"
         )
     utils.seed_everything(seed)
-    tags = ["representation_learning", "baseline", "simsiam", f"{embedding_size}"]
+    tags = ["debug"]
 
     if linear_lr:
         learning_rate = 0.03 * batch_size / 256
@@ -104,6 +104,7 @@ def train_simsiam(
             backbone_model.conv1 = torch.nn.Conv2d(
                 kernel_size=3, padding=1, stride=2, in_channels=3, out_channels=64
             )
+            backbone_model.maxpool = torch.nn.Identity()
             projection_mlp = torch.nn.Sequential(
                 torch.nn.Linear(
                     backbone_model.fc.in_features, embedding_size, bias=False
