@@ -156,8 +156,8 @@ class OurSimSiam(LightningModule):
         predictions = torch.concat(predictions, dim=0)
         labels = torch.concat(labels, dim=0)
 
-        predictions = predictions.detach().numpy()
-        labels = labels.detach().numpy()
+        predictions = predictions.detach().cpu().numpy()
+        labels = labels.detach().cpu().numpy()
 
         knn = KNeighborsClassifier()
         knn.fit(predictions, labels)
@@ -175,8 +175,8 @@ class OurSimSiam(LightningModule):
         predictions = torch.concat(predictions, dim=0)
         labels = torch.concat(labels, dim=0)
 
-        predictions = predictions.numpy()
-        labels = labels.numpy()
+        predictions = predictions.cpu().numpy()
+        labels = labels.cpu().numpy()
 
         self.val_predictions = predictions
         self.val_labels = labels
