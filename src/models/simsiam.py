@@ -191,13 +191,7 @@ class OurSimSiam(LightningModule):
             weight_decay=self.weight_decay,
             momentum=0.9,
         )
-
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer, self.max_epochs
-            ),
-        }
+        return optimizer
 
 
 def get_simsiam_predictor(embedding_dim: int = 432, hidden_dim: int = 200):

@@ -81,7 +81,7 @@ def train_simsiam(
     debug: bool,
     backbone: str,
     linear_lr: bool,
-    trials: int
+    trials: int,
 ):
     backbones = {"resnet", "simpnet"}
     if backbone not in backbones:
@@ -89,21 +89,17 @@ def train_simsiam(
             f"Backbone {backbone} is not supported\n available \
                 backbones are: f{backbones}"
         )
-<<<<<<< HEAD
-    # tags = ["representation_learning", "baseline", "simsiam", f"{embedding_size}"]
-    tags = ["debug"]
-    if linear_lr:
-        learning_rate = 0.03 * batch_size / 256
-
-=======
     utils.seed_everything(seed)
-    tags = ["debug"]
+    tags = ["simsiam"]
+    notes = "removed the first max pool. No lr schedule"
 
     if linear_lr:
         learning_rate = 0.03 * batch_size / 256
 
     if not debug:
-        logger = WandbLogger(project="rep-in-fed", entity="pydqn", tags=tags)
+        logger = WandbLogger(
+            project="rep-in-fed", entity="pydqn", tags=tags, notes=notes
+        )
 
     if pl_bolts:
         simsiam_model = simsiam.SimSiamModel(max_epochs=epochs)
@@ -146,7 +142,6 @@ def train_simsiam(
             max_epochs=epochs,
         )
 
->>>>>>> d5b25bc9b732009fec7b200893492fd0480ecdd4
     train, test = model.make_dataset.load_dataset()
 
     transforms = process_data.get_simsiam_transforms(img_size=32)
@@ -182,9 +177,6 @@ def train_simsiam(
                     ),
                     torch.nn.BatchNorm1d(embedding_size),
                     torch.nn.ReLU(),
-                    torch.nn.Linear(embedding_size, embedding_size, bias=False),
-                    torch.nn.BatchNorm1d(embedding_size),
-                    torch.nn.ReLU(),
                     torch.nn.Linear(embedding_size, embedding_size),
                     torch.nn.BatchNorm1d(embedding_size, affine=False),
                 )
@@ -216,7 +208,7 @@ def train_simsiam(
                 logger=logger,
             )
             if GPU
-            else Trainer(max_epochs=epochs, logger=logger, fast_dev_run=True)
+            else Trainer(max_epochs=epochs, logger=logger)
         )
         trainer.fit(simsiam_model, trainloader_bl, valloader_bl)
         wandb.finish()
