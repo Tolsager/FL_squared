@@ -1,10 +1,8 @@
 # import os
-import torchvision
-
 import click
 import torch
+import torchvision
 from dotenv import find_dotenv, load_dotenv
-from pl_bolts.callbacks.ssl_online import SSLOnlineEvaluator
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
 
@@ -68,40 +66,152 @@ def train_bl(learning_rate: float, batch_size: int, seed: int, epochs: int):
 @click.option("--seed", type=int, default=0)
 @click.option("--epochs", type=int, default=2)
 @click.option("--embedding-size", type=int, default=2048)
-@click.option("--pl-bolts", is_flag=True)
 @click.option("--debug", is_flag=True)
-def train_simsiam(learning_rate: float, batch_size: int, seed: int, epochs: int, embedding_size: int, pl_bolts: bool,
-                  debug: bool):
+@click.option("--backbone", default="resnet")
+@click.option("--linear-lr", is_flag=True)
+@click.option("--trials", type=int, default=1)
+def train_simsiam(
+    learning_rate: float,
+    batch_size: int,
+    seed: int,
+    epochs: int,
+    embedding_size: int,
+    debug: bool,
+    backbone: str,
+    linear_lr: bool,
+    trials: int,
+):
+    backbones = {"resnet", "simpnet"}
+    if backbone not in backbones:
+        raise ValueError(
+            f"Backbone {backbone} is not supported\n available \
+                backbones are: f{backbones}"
+        )
     utils.seed_everything(seed)
-    tags = ["representation_learning", "baseline", "simsiam", f"{embedding_size}"]
+    tags = ["simsiam", "high learning rate"]
+    notes = "Very high learning rate, no blur, no weight decay, 2-layer MLP"
 
-    if not debug:
-        logger = WandbLogger(project="rep-in-fed", entity="pydqn", tags=tags)
-
-    if pl_bolts:
-        simsiam_model = simsiam.SimSiamModel(max_epochs=epochs)
-    else:
-        predictor = simsiam.get_simsiam_predictor(embedding_dim=embedding_size)
-        simsiam_model = simsiam.OurSimSiam(
-            backbone=model.SimpNet(embedding_size=embedding_size, learning_rate=learning_rate),
-            predictor=predictor)
+    if linear_lr:
+        learning_rate = 0.03 * batch_size / 256
 
     train, test = model.make_dataset.load_dataset()
 
     transforms = process_data.get_simsiam_transforms(img_size=32)
     train, val = process_data.train_val_split(train, 0.2)
-    val = process_data.AugmentedDataset(val, torchvision.transforms.transforms.Compose(process_data.cifar10_standard_transforms))
+    val = process_data.AugmentedDataset(
+        val,
+        torchvision.transforms.transforms.Compose(
+            process_data.cifar10_standard_transforms
+        ),
+    )
     train = process_data.SimSiamDataset(train, transforms)
     trainloader_bl = torch.utils.data.DataLoader(train, batch_size=batch_size)
     valloader_bl = torch.utils.data.DataLoader(val, batch_size=batch_size)
-    trainer = Trainer(accelerator="gpu", gpus=1, max_epochs=epochs, logger=logger) if GPU else Trainer(
-        max_epochs=epochs, logger=logger, fast_dev_run=True)
-    trainer.fit(simsiam_model, trainloader_bl, valloader_bl)
+
+    for trial in range(trials):
+        seed = seed + trial
+        utils.seed_everything(seed)
+
+        if not debug:
+            logger = WandbLogger(project="rep-in-fed", entity="pydqn", tags=tags, notes=notes)
+
+        if backbone == "resnet":
+            backbone_model = torchvision.models.resnet18()
+            backbone_model.conv1 = torch.nn.Conv2d(
+                kernel_size=3, padding=1, stride=2, in_channels=3, out_channels=64
+            )
+            projection_mlp = torch.nn.Sequential(
+                torch.nn.Linear(
+                    backbone_model.fc.in_features, embedding_size, bias=False
+                ),
+                torch.nn.BatchNorm1d(embedding_size),
+                torch.nn.ReLU(),
+                torch.nn.Linear(embedding_size, embedding_size),
+                torch.nn.BatchNorm1d(embedding_size, affine=False),
+            )
+            # backbone_model.fc = torch.nn.Linear(
+            #     in_features=backbone_model.fc.in_features, out_features=embedding_size
+            # )
+            backbone_model.fc = projection_mlp
+        elif backbone == "simpnet":
+            backbone_model = model.SimpNet(
+                embedding_size=embedding_size, learning_rate=learning_rate
+            )
+
+        predictor = simsiam.get_simsiam_predictor(
+            embedding_dim=embedding_size, hidden_dim=512
+        )
+        simsiam_model = simsiam.OurSimSiam(
+            backbone=backbone_model,
+            predictor=predictor,
+            learning_rate=learning_rate,
+            weight_decay=0.0005,
+            max_epochs=epochs,
+        )
+
+        trainer = (
+            Trainer(
+                accelerator="gpu",
+                gpus=1,
+                max_epochs=epochs,
+                logger=logger,
+            )
+            if GPU
+            else Trainer(max_epochs=epochs, logger=logger)
+        )
+        trainer.fit(simsiam_model, trainloader_bl, valloader_bl)
+        wandb.finish()
+
+
+@click.command(name="imagenet")
+@click.option("--learning-rate", type=float, default=0.001)
+@click.option("--batch-size", type=int, default=32)
+@click.option("--seed", type=int, default=0)
+@click.option("--epochs", type=int, default=2)
+@click.option("--embedding-size", type=int, default=1000)
+@click.option("--arch", type=str, default="simpnet")
+def train_imagenet(
+    learning_rate: float,
+    batch_size: int,
+    seed: int,
+    epochs: int,
+    embedding_size: int,
+    arch: str,
+):
+    utils.seed_everything(seed)
+
+    tags = ["supervised_learning", f"{arch}", "imagenet"]
+
+    logger = WandbLogger(project="rep-in-fed", entity="pydqn", tags=tags)
+    if arch == "simpnet":
+        simpnet_model = model.SimpNet(embedding_size, learning_rate=learning_rate)
+
+    train = torchvision.datasets.ImageFolder(
+        "data/raw/imagenet/train",
+        transform=torchvision.transforms.Compose(
+            process_data.imagenet_standard_transforms
+        ),
+    )
+    train = process_data.shuffle_dataset(train)
+    val = torchvision.datasets.ImageFolder(
+        "data/raw/imagenet/val",
+        transform=torchvision.transforms.Compose(
+            process_data.imagenet_standard_transforms
+        ),
+    )
+    trainloader = torch.utils.data.DataLoader(train, batch_size=batch_size)
+    valloader = torch.utils.data.DataLoader(val, batch_size=batch_size)
+
+    trainer = Trainer(
+        accelerator="gpu", gpus=1, max_epochs=epochs, logger=logger
+    )  # Not feasible to use a non GPU machine to train
+    trainer.fit(simpnet_model, trainloader, valloader)
 
 
 cli.add_command(train_fl)
 cli.add_command(train_bl)
 cli.add_command(train_simsiam)
+cli.add_command(train_imagenet)
 
 if __name__ == "__main__":
     cli()

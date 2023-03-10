@@ -12,6 +12,18 @@ cifar10_standard_transforms = [
     torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)),
 ]
 
+imagenet_standard_transforms = [
+    torchvision.transforms.ToTensor(),
+    torchvision.transforms.Normalize(
+        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+    ),
+]
+
+
+def shuffle_dataset(dataset: torch.utils.data.Dataset) -> torch.utils.data.Dataset:
+    indices = np.random.choice(len(dataset), len(dataset), replace=False)
+    return torch.utils.data.Subset(dataset, indices)
+
 
 class DataSplitter:
     def __init__(

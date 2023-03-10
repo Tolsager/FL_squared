@@ -15,6 +15,6 @@ pytest
 isort
 pre-commit
 black
+scikit-learn
 wandb
 pytorch-lightning
-lightning-bolts
