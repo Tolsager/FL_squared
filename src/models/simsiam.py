@@ -4,7 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from pytorch_lightning import LightningModule
-from sklearn.neighbors import KNeighborsClassifier
+
+from src.models.metrics import KNN
 
 
 class SimSiam:
@@ -115,6 +116,9 @@ class OurSimSiam(LightningModule):
         learning_rate: float = 0.001,
         weight_decay: float = 0.01,
         max_epochs: int = 100,
+        n_classes: int = 10,
+        top_k: int = 1,
+        knn_k: int = 5,
     ):
         super().__init__()
         # self.feature_dim = feature_dim
@@ -124,6 +128,9 @@ class OurSimSiam(LightningModule):
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
         self.max_epochs = max_epochs
+        self.n_classes = n_classes
+        self.top_k = top_k
+        self.knn_k = knn_k
 
     def forward(self, x1, x2):
         z1 = self.backbone(x1)
@@ -150,19 +157,19 @@ class OurSimSiam(LightningModule):
         return {"prediction": prediction, "label": label}
 
     def training_epoch_end(self, training_step_outputs: list[tuple]):
-        predictions = [i["prediction"] for i in training_step_outputs]
-        labels = [i["label"] for i in training_step_outputs]
+        train_predictions = [i["prediction"] for i in training_step_outputs]
+        train_labels = [i["label"] for i in training_step_outputs]
 
-        predictions = torch.concat(predictions, dim=0)
-        labels = torch.concat(labels, dim=0)
+        train_predictions = torch.concat(train_predictions, dim=0)
+        train_labels = torch.concat(train_labels, dim=0)
 
-        predictions = predictions.detach().cpu().numpy()
-        labels = labels.detach().cpu().numpy()
+        train_predictions = train_predictions.detach().cpu().numpy()
+        train_labels = train_labels.detach().cpu().numpy()
 
-        knn = KNeighborsClassifier()
-        knn.fit(predictions, labels)
-
-        val_acc = knn.score(self.val_predictions, self.val_labels)
+        knn = KNN(n_classes=self.n_classes, top_k=self.top_k, knn_k=self.knn_k)
+        val_acc = knn.knn_acc(
+            train_predictions, train_labels, self.val_predictions, self.val_labels
+        )
 
         self.log("val_acc", val_acc)
 
