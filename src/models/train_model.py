@@ -89,7 +89,8 @@ def train_simsiam(
         )
     utils.seed_everything(seed)
     tags = ["simsiam", "high learning rate"]
-    notes = "Very high learning rate, no blur, no weight decay, 2-layer MLP"
+    # notes = "Very high learning rate, no blur, no weight decay, 2-layer MLP"
+    notes = input("Please provide a description of the experiment:\n")
 
     if linear_lr:
         learning_rate = 0.03 * batch_size / 256
@@ -113,7 +114,9 @@ def train_simsiam(
         utils.seed_everything(seed)
 
         if not debug:
-            logger = WandbLogger(project="rep-in-fed", entity="pydqn", tags=tags, notes=notes)
+            logger = WandbLogger(
+                project="rep-in-fed", entity="pydqn", tags=tags, notes=notes
+            )
 
         if backbone == "resnet":
             backbone_model = torchvision.models.resnet18()
@@ -148,19 +151,23 @@ def train_simsiam(
             weight_decay=0.0005,
             max_epochs=epochs,
         )
-
-        trainer = (
-            Trainer(
-                accelerator="gpu",
-                gpus=1,
-                max_epochs=epochs,
-                logger=logger,
+        if debug:
+            trainer = Trainer(limit_train_batches=2, limit_val_batches=2)
+        else:
+            trainer = (
+                Trainer(
+                    accelerator="gpu",
+                    gpus=1,
+                    max_epochs=epochs,
+                    logger=logger,
+                )
+                if GPU
+                else Trainer(max_epochs=epochs, logger=logger)
             )
-            if GPU
-            else Trainer(max_epochs=epochs, logger=logger)
-        )
+
         trainer.fit(simsiam_model, trainloader_bl, valloader_bl)
-        wandb.finish()
+        if not debug:
+            wandb.finish()
 
 
 @click.command(name="imagenet")

@@ -70,6 +70,12 @@ class KNN:
         return pred_labels.numpy()
 
     def knn_acc(self, x_test, y_test, x_train, y_train):
+        ys = [y_train, y_test]
+        for i, y in enumerate(ys):
+            if y.ndim == 1:
+                ys[i] = y.reshape(-1, 1)
+        y_train, y_test = ys
+
         sim_weight, sim_indices = self.calc_sim(x_test, x_train, self.knn_k)
         pred_labels = self.knn_predict(sim_weight, sim_indices, y_train)
         _acc = get_accuracy(pred_labels, y_test, self.top_k)

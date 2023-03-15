@@ -117,8 +117,8 @@ class OurSimSiam(LightningModule):
         weight_decay: float = 0.01,
         max_epochs: int = 100,
         n_classes: int = 10,
-        top_k: int = 1,
-        knn_k: int = 5,
+        top_k: list[int] = [1],
+        knn_k: int = 10,
     ):
         super().__init__()
         # self.feature_dim = feature_dim
