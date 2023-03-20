@@ -88,8 +88,6 @@ def train_simsiam(
                 backbones are: f{backbones}"
         )
     utils.seed_everything(seed)
-    tags = ["simsiam", "high learning rate"]
-    notes = "Very high learning rate, no blur, no weight decay, 2-layer MLP"
 
     if linear_lr:
         learning_rate = 0.03 * batch_size / 256
@@ -113,26 +111,32 @@ def train_simsiam(
         utils.seed_everything(seed)
 
         if not debug:
-            logger = WandbLogger(project="rep-in-fed", entity="pydqn", tags=tags, notes=notes)
+            tags = ["simsiam", "high learning rate"]
+            notes = "memory test"
+            # notes = input("Please provide a description of the experiment:\n")
+            logger = WandbLogger(
+                project="rep-in-fed", entity="pydqn", tags=tags, notes=notes
+            )
 
         if backbone == "resnet":
             backbone_model = torchvision.models.resnet18()
             backbone_model.conv1 = torch.nn.Conv2d(
-                kernel_size=3, padding=1, stride=2, in_channels=3, out_channels=64
+                kernel_size=3, padding=1, stride=1, in_channels=3, out_channels=64, bias=False
             )
-            projection_mlp = torch.nn.Sequential(
+            backbone_model.maxpool = torch.nn.Identity()
+            projector = torch.nn.Sequential(
                 torch.nn.Linear(
                     backbone_model.fc.in_features, embedding_size, bias=False
                 ),
                 torch.nn.BatchNorm1d(embedding_size),
                 torch.nn.ReLU(),
-                torch.nn.Linear(embedding_size, embedding_size),
+                torch.nn.Linear(embedding_size, embedding_size, bias=False),
                 torch.nn.BatchNorm1d(embedding_size, affine=False),
             )
             # backbone_model.fc = torch.nn.Linear(
             #     in_features=backbone_model.fc.in_features, out_features=embedding_size
             # )
-            backbone_model.fc = projection_mlp
+            backbone_model.fc = torch.nn.Identity()
         elif backbone == "simpnet":
             backbone_model = model.SimpNet(
                 embedding_size=embedding_size, learning_rate=learning_rate
@@ -143,24 +147,30 @@ def train_simsiam(
         )
         simsiam_model = simsiam.OurSimSiam(
             backbone=backbone_model,
+            projector=projector,
             predictor=predictor,
             learning_rate=learning_rate,
             weight_decay=0.0005,
             max_epochs=epochs,
         )
-
-        trainer = (
-            Trainer(
-                accelerator="gpu",
-                gpus=1,
-                max_epochs=epochs,
-                logger=logger,
+        if debug:
+            trainer = Trainer(limit_train_batches=2, limit_val_batches=2)
+        else:
+            trainer = (
+                Trainer(
+                    accelerator="gpu",
+                    gpus=1,
+                    max_epochs=epochs,
+                    logger=logger,
+                    callbacks=[simsiam.TrainFeatures()]
+                )
+                if GPU
+                else Trainer(max_epochs=epochs, logger=logger)
             )
-            if GPU
-            else Trainer(max_epochs=epochs, logger=logger)
-        )
+
         trainer.fit(simsiam_model, trainloader_bl, valloader_bl)
-        wandb.finish()
+        if not debug:
+            wandb.finish()
 
 
 @click.command(name="imagenet")

@@ -148,12 +148,16 @@ class SimSiamDataset(AugmentedDataset):
         transforms: torchvision.transforms.transforms.Compose,
     ):
         super().__init__(dataset, transforms)
+        self.standard_transforms = torchvision.transforms.Compose(
+            cifar10_standard_transforms
+        )
 
     def __getitem__(self, i):
         image, label = self.dataset[i]
         aug1 = self.transforms(image)
         aug2 = self.transforms(image)
-        return aug1, aug2, label
+        image = self.standard_transforms(image)
+        return aug1, aug2, image, label
 
 
 def get_cifar10_transforms() -> torchvision.transforms.transforms.Compose:
@@ -183,7 +187,7 @@ def get_simsiam_transforms(
     img_size: Union[tuple[int, int], int]
 ) -> torchvision.transforms.transforms.Compose:
     augmentations = [
-        torchvision.transforms.RandomResizedCrop(img_size, scale=(0.2, 1.0)),
+        torchvision.transforms.RandomResizedCrop(img_size, scale=(0.8, 1.0)),
         torchvision.transforms.RandomApply(
             [
                 torchvision.transforms.ColorJitter(
@@ -193,7 +197,7 @@ def get_simsiam_transforms(
             p=0.8,
         ),
         torchvision.transforms.RandomGrayscale(p=0.2),
-        torchvision.transforms.RandomApply([GaussianBlur([0.1, 2.0])], p=0.5),
+        # torchvision.transforms.RandomApply([GaussianBlur([0.1, 2.0])], p=0.5),
         torchvision.transforms.RandomHorizontalFlip(),
     ]
     augmentations.extend(cifar10_standard_transforms)
