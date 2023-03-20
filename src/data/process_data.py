@@ -108,7 +108,7 @@ def train_val_split(
     val_size: Union[int, float],
     shuffle: bool = False,
 ) -> Tuple[torch.utils.data.dataset.Subset, torch.utils.data.dataset.Subset]:
-
+    # TODO: DOESNT WORK AT ALL LIKE IT SHOULD
     if shuffle:
         indices = np.random.choice(len(dataset), len(dataset), replace=False)
     else:
@@ -204,4 +204,4 @@ def get_simsiam_transforms(
         # torchvision.transforms.RandomApply([GaussianBlur([0.1, 2.0])], p=0.5),
     ]
     augmentations.extend(cifar10_standard_transforms)
-    return torchvision.transforms.transforms.Compose(augmentations)
+    return torchvision.transforms.Compose(augmentations)

@@ -71,15 +71,15 @@ def train_bl(learning_rate: float, batch_size: int, seed: int, epochs: int):
 @click.option("--linear-lr", is_flag=True)
 @click.option("--trials", type=int, default=1)
 def train_simsiam(
-    learning_rate: float,
-    batch_size: int,
-    seed: int,
-    epochs: int,
-    embedding_size: int,
-    debug: bool,
-    backbone: str,
-    linear_lr: bool,
-    trials: int,
+        learning_rate: float,
+        batch_size: int,
+        seed: int,
+        epochs: int,
+        embedding_size: int,
+        debug: bool,
+        backbone: str,
+        linear_lr: bool,
+        trials: int,
 ):
     backbones = {"resnet", "simpnet"}
     if backbone not in backbones:
@@ -94,17 +94,13 @@ def train_simsiam(
 
     # train, test = model.make_dataset.load_dataset()
     train = torchvision.datasets.CIFAR10(root="data/raw", train=True)
-    val = torchvision.datasets.CIFAR10(root="data/raw", train=False)
+    val = torchvision.datasets.CIFAR10(root="data/raw", train=False, transform=torchvision.transforms.Compose(
+        process_data.cifar10_standard_transforms))
 
     transforms = process_data.get_simsiam_transforms(img_size=32)
     # train, val = process_data.train_val_split(train, 0.2)
     train = process_data.SimSiamDataset(train, transforms)
-    val = process_data.AugmentedDataset(
-        val,
-        torchvision.transforms.transforms.Compose(
-            process_data.cifar10_standard_transforms
-        ),
-    )
+
     trainloader_bl = torch.utils.data.DataLoader(train, batch_size=batch_size)
     valloader_bl = torch.utils.data.DataLoader(val, batch_size=batch_size)
 
@@ -122,10 +118,10 @@ def train_simsiam(
         if backbone == "resnet":
             backbone_model = resnet.ResNet18()
             projector = torch.nn.Sequential(
-                torch.nn.Linear(512, embedding_size, bias=False),
+                torch.nn.Linear(512, embedding_size),
                 torch.nn.BatchNorm1d(embedding_size),
-                torch.nn.ReLU(),
-                torch.nn.Linear(embedding_size, embedding_size, bias=False),
+                torch.nn.ReLU(inplace=True),
+                torch.nn.Linear(embedding_size, embedding_size),
                 torch.nn.BatchNorm1d(embedding_size, affine=False),
             )
 
@@ -180,12 +176,12 @@ def train_simsiam(
 @click.option("--embedding-size", type=int, default=1000)
 @click.option("--arch", type=str, default="simpnet")
 def train_imagenet(
-    learning_rate: float,
-    batch_size: int,
-    seed: int,
-    epochs: int,
-    embedding_size: int,
-    arch: str,
+        learning_rate: float,
+        batch_size: int,
+        seed: int,
+        epochs: int,
+        embedding_size: int,
+        arch: str,
 ):
     utils.seed_everything(seed)
 

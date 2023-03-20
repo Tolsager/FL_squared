@@ -124,7 +124,7 @@ class OurSimSiam(LightningModule):
         self.backbone = backbone
         self.projector = projector
         self.predictor = predictor
-        self.criterion = torch.nn.CosineSimilarity(dim=1)
+        self.criterion = torch.nn.CosineSimilarity(dim=-1)
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
         self.max_epochs = max_epochs
@@ -211,9 +211,9 @@ class KNNCallback(Callback):
 
 def get_simsiam_predictor(embedding_dim: int = 432, hidden_dim: int = 200):
     predictor = torch.nn.Sequential(
-        torch.nn.Linear(embedding_dim, hidden_dim, bias=False),
+        torch.nn.Linear(embedding_dim, hidden_dim),
         torch.nn.BatchNorm1d(hidden_dim),
-        torch.nn.ReLU(),
+        torch.nn.ReLU(inplace=True),
         torch.nn.Linear(hidden_dim, embedding_dim),
     )
     return predictor
