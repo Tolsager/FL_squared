@@ -187,7 +187,7 @@ def get_simsiam_transforms(
     img_size: Union[tuple[int, int], int]
 ) -> torchvision.transforms.transforms.Compose:
     augmentations = [
-        torchvision.transforms.RandomResizedCrop(img_size, scale=(0.8, 1.0)),
+        torchvision.transforms.RandomResizedCrop(img_size, scale=(0.2, 1.0)),
         torchvision.transforms.RandomApply(
             [
                 torchvision.transforms.ColorJitter(

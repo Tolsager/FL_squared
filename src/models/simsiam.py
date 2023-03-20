@@ -111,16 +111,13 @@ class SimpNetEncoder(nn.Module):
 
 class OurSimSiam(LightningModule):
     def __init__(
-        self,
-        backbone: torch.nn.Module,
-        projector: torch.nn.Module,
-        predictor: torch.nn.Module,
-        learning_rate: float = 0.001,
-        weight_decay: float = 0.01,
-        max_epochs: int = 100,
-        n_classes: int = 10,
-        top_k: list[int] = [1],
-        knn_k: int = 10,
+            self,
+            backbone: torch.nn.Module,
+            projector: torch.nn.Module,
+            predictor: torch.nn.Module,
+            learning_rate: float = 0.001,
+            weight_decay: float = 0.01,
+            max_epochs: int = 100,
     ):
         super().__init__()
         # self.feature_dim = feature_dim
@@ -131,9 +128,6 @@ class OurSimSiam(LightningModule):
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
         self.max_epochs = max_epochs
-        self.n_classes = n_classes
-        self.top_k = top_k
-        self.knn_k = knn_k
 
     def forward(self, x1, x2):
         z1 = self.backbone(x1)
@@ -150,14 +144,11 @@ class OurSimSiam(LightningModule):
         im1, im2, image, label = batch
         prediction1, prediction2, z1, z2 = self(im1, im2)
         loss = -0.5 * (
-            self.criterion(prediction1, z2).mean()
-            + self.criterion(prediction2, z1).mean()
+                self.criterion(prediction1, z2).mean()
+                + self.criterion(prediction2, z1).mean()
         )
         self.log("train_loss", loss, on_epoch=True)
         return loss
-
-    def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int):
-        pass
 
     def configure_optimizers(self):
         optimizer = torch.optim.SGD(
@@ -170,13 +161,16 @@ class OurSimSiam(LightningModule):
         return [optimizer], [{"scheduler": scheduler, "interval": "epoch"}]
 
 
-class TrainFeatures(Callback):
-    def __init__(self, val_dataloader: torch.utils.data.Dataloader):
+class KNNCallback(Callback):
+    def __init__(self, val_dataloader: torch.utils.data.DataLoader, knn_k: int = 200, top_k: list[int] = [1],
+                 n_classes: int = 10):
         self.val_dataloader = val_dataloader
+        self.knn_k = knn_k
+        self.top_k = top_k
+        self.n_classes = n_classes
 
     def on_train_epoch_end(self, trainer, pl_module):
         train_dataloader = trainer.train_dataloader
-        val_dataloader = trainer.val_dataloaders[0]
         train_features = []
         train_labels = []
         val_features = []
@@ -193,7 +187,7 @@ class TrainFeatures(Callback):
             train_features = torch.concat(train_features, dim=0).numpy()
             train_labels = torch.concat(train_labels, dim=0).numpy()
 
-            for batch in val_dataloader:
+            for batch in self.val_dataloader:
                 im, label = batch
                 im = im.cuda()
                 val_features.append(pl_module.backbone(im).cpu())
@@ -202,7 +196,7 @@ class TrainFeatures(Callback):
             val_features = torch.concat(val_features, dim=0).numpy()
             val_labels = torch.concat(val_labels, dim=0).numpy()
 
-            knn = KNN(n_classes=10, top_k=[1], knn_k=10)
+            knn = KNN(n_classes=self.n_classes, top_k=self.top_k, knn_k=self.knn_k)
             val_acc = knn.knn_acc(
                 val_features, val_labels, train_features, train_labels
             )
