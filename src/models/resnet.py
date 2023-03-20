@@ -7,6 +7,7 @@ Reference:
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 # from lib.normalize import Normalize
 
 
@@ -84,7 +85,7 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, num_blocks, low_dim=128):
+    def __init__(self, block, num_blocks):
         super(ResNet, self).__init__()
         self.in_planes = 64
 
@@ -94,7 +95,6 @@ class ResNet(nn.Module):
         self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2)
         self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
         self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
-        self.fc = nn.Linear(512 * block.expansion, low_dim)
         # self.l2norm = Normalize(2)
 
     def _make_layer(self, block, planes, num_blocks, stride):
@@ -118,21 +118,21 @@ class ResNet(nn.Module):
         return out
 
 
-def ResNet18(low_dim=128):
-    return ResNet(BasicBlock, [2, 2, 2, 2], low_dim)
+def ResNet18():
+    return ResNet(BasicBlock, [2, 2, 2, 2])
 
 
-def ResNet34(low_dim=128):
-    return ResNet(BasicBlock, [3, 4, 6, 3], low_dim)
+def ResNet34():
+    return ResNet(BasicBlock, [3, 4, 6, 3])
 
 
-def ResNet50(low_dim=128):
-    return ResNet(Bottleneck, [3, 4, 6, 3], low_dim)
+def ResNet50():
+    return ResNet(Bottleneck, [3, 4, 6, 3])
 
 
-def ResNet101(low_dim=128):
-    return ResNet(Bottleneck, [3, 4, 23, 3], low_dim)
+def ResNet101():
+    return ResNet(Bottleneck, [3, 4, 23, 3])
 
 
-def ResNet152(low_dim=128):
-    return ResNet(Bottleneck, [3, 8, 36, 3], low_dim)
+def ResNet152():
+    return ResNet(Bottleneck, [3, 8, 36, 3])
