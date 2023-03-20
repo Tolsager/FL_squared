@@ -1,3 +1,4 @@
+import math
 from typing import Tuple
 
 import torch
@@ -159,16 +160,14 @@ class OurSimSiam(LightningModule):
         pass
 
     def configure_optimizers(self):
-        # return torch.optim.AdamW(
-        #     self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
-        # )
         optimizer = torch.optim.SGD(
             self.parameters(),
             lr=self.learning_rate,
             weight_decay=self.weight_decay,
             momentum=0.9,
         )
-        return optimizer
+        scheduler = ConsineLRScheduler(self.learning_rate, self.max_epochs)
+        return [optimizer], [{"scheduler": scheduler, "interval": "epoch"}]
 
 
 class TrainFeatures(Callback):
@@ -219,3 +218,16 @@ def get_simsiam_predictor(embedding_dim: int = 432, hidden_dim: int = 200):
         torch.nn.Linear(hidden_dim, embedding_dim),
     )
     return predictor
+
+
+class ConsineLRScheduler(torch.optim.lr_scheduler.LRScheduler):
+    def __init__(self, initial_lr: float, max_epochs: int):
+        super().__init__()
+        self.current_lr = initial_lr
+        self.max_epochs = max_epochs
+
+    def get_lr(self):
+        self.current_lr *= 0.5 * (
+            1.0 + math.cos(math.pi * self.last_epoch / self.max_epochs)
+        )
+        return self.current_lr
