@@ -112,8 +112,8 @@ def train_simsiam(
 
         if not debug:
             tags = ["simsiam", "high learning rate"]
-            # notes = "Very high learning rate, no blur, no weight decay, 2-layer MLP"
-            notes = input("Please provide a description of the experiment:\n")
+            notes = "memory test"
+            # notes = input("Please provide a description of the experiment:\n")
             logger = WandbLogger(
                 project="rep-in-fed", entity="pydqn", tags=tags, notes=notes
             )
@@ -121,8 +121,9 @@ def train_simsiam(
         if backbone == "resnet":
             backbone_model = torchvision.models.resnet18()
             backbone_model.conv1 = torch.nn.Conv2d(
-                kernel_size=3, padding=1, stride=2, in_channels=3, out_channels=64
+                kernel_size=3, padding=1, stride=1, in_channels=3, out_channels=64, bias=False
             )
+            backbone_model.maxpool = torch.nn.Identity()
             projector = torch.nn.Sequential(
                 torch.nn.Linear(
                     backbone_model.fc.in_features, embedding_size, bias=False
@@ -161,6 +162,7 @@ def train_simsiam(
                     gpus=1,
                     max_epochs=epochs,
                     logger=logger,
+                    callbacks=[simsiam.TrainFeatures()]
                 )
                 if GPU
                 else Trainer(max_epochs=epochs, logger=logger)

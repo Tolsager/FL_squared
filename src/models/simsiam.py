@@ -3,7 +3,7 @@ from typing import Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from pytorch_lightning import LightningModule
+from pytorch_lightning import LightningModule, Callback
 
 from src.models.metrics import KNN
 
@@ -152,46 +152,46 @@ class OurSimSiam(LightningModule):
             self.criterion(prediction1, z2).mean()
             + self.criterion(prediction2, z1).mean()
         )
-        train_features = self.backbone(image)
         self.log("train_loss", loss, on_epoch=True)
-        return {"loss": loss, "train_features": train_features, "label": label}
+        return loss
 
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int):
-        im, label = batch
-        val_features = self.backbone(im)
-        return {"val_features": val_features, "label": label}
+        pass
+    #     # im, label = batch
+    #     # val_features = self.backbone(im)
+    #     # return {"val_features": val_features, "label": label}
 
-    def training_epoch_end(self, training_step_outputs: list[tuple]):
-        train_features = [i["train_features"] for i in training_step_outputs]
-        train_labels = [i["label"] for i in training_step_outputs]
-
-        train_features = torch.concat(train_features, dim=0)
-        train_labels = torch.concat(train_labels, dim=0)
-
-        train_features = train_features.detach().cpu().numpy()
-        train_labels = train_labels.detach().cpu().numpy()
-
-        knn = KNN(n_classes=self.n_classes, top_k=self.top_k, knn_k=self.knn_k)
-        val_acc = knn.knn_acc(
-            train_features, train_labels, self.val_features, self.val_labels
-        )
-
-        self.log("val_acc", val_acc)
+    # def training_epoch_end(self, training_step_outputs: list[tuple]):
+    #     train_features = [i["train_features"] for i in training_step_outputs]
+    #     train_labels = [i["label"] for i in training_step_outputs]
+    #
+    #     train_features = torch.concat(train_features, dim=0)
+    #     train_labels = torch.concat(train_labels, dim=0)
+    #
+    #     train_features = train_features.detach().cpu().numpy()
+    #     train_labels = train_labels.detach().cpu().numpy()
+    #
+    #     knn = KNN(n_classes=self.n_classes, top_k=self.top_k, knn_k=self.knn_k)
+    #     val_acc = knn.knn_acc(
+    #         train_features, train_labels, self.val_features, self.val_labels
+    #     )
+    #
+    #     self.log("val_acc", val_acc)
 
         # self.lr.fit(predictions, labels)
 
-    def validation_epoch_end(self, validation_step_outputs: list[tuple]):
-        val_features = [i["val_features"] for i in validation_step_outputs]
-        labels = [i["label"] for i in validation_step_outputs]
-
-        val_features = torch.concat(val_features, dim=0)
-        labels = torch.concat(labels, dim=0)
-
-        val_features = val_features.cpu().numpy()
-        labels = labels.cpu().numpy()
-
-        self.val_features = val_features
-        self.val_labels = labels
+    # def validation_epoch_end(self, validation_step_outputs: list[tuple]):
+    #     val_features = [i["val_features"] for i in validation_step_outputs]
+    #     labels = [i["label"] for i in validation_step_outputs]
+    #
+    #     val_features = torch.concat(val_features, dim=0)
+    #     labels = torch.concat(labels, dim=0)
+    #
+    #     val_features = val_features.cpu().numpy()
+    #     labels = labels.cpu().numpy()
+    #
+    #     self.val_features = val_features
+    #     self.val_labels = labels
 
     def configure_optimizers(self):
         # return torch.optim.AdamW(
@@ -204,6 +204,41 @@ class OurSimSiam(LightningModule):
             momentum=0.9,
         )
         return optimizer
+
+
+class TrainFeatures(Callback):
+    def on_train_epoch_end(self, trainer, pl_module):
+        train_dataloader = trainer.train_dataloader
+        val_dataloader = trainer.val_dataloaders[0]
+        train_features = []
+        train_labels = []
+        val_features = []
+        val_labels = []
+
+        pl_module.eval()
+        with torch.no_grad():
+            for batch in train_dataloader:
+                _, _, im, label = batch
+                im = im.cuda()
+                train_features.append(pl_module.backbone(im).cpu())
+                train_labels.append(label.cpu())
+
+            train_features = torch.concat(train_features, dim=0).numpy()
+            train_labels = torch.concat(train_labels, dim=0).numpy()
+
+            for batch in val_dataloader:
+                im, label = batch
+                im = im.cuda()
+                val_features.append(pl_module.backbone(im).cpu())
+                val_labels.append(label.cpu())
+
+            val_features = torch.concat(val_features, dim=0).numpy()
+            val_labels = torch.concat(val_labels, dim=0).numpy()
+
+            knn = KNN(n_classes=10, top_k=[1], knn_k=10)
+            val_acc = knn.knn_acc(val_features, val_labels, train_features, train_labels)
+
+        pl_module.log("val_acc", val_acc)
 
 
 def get_simsiam_predictor(embedding_dim: int = 432, hidden_dim: int = 200):
