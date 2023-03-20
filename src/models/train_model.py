@@ -9,7 +9,7 @@ from pytorch_lightning.loggers import WandbLogger
 import wandb
 from src import utils
 from src.data import process_data
-from src.models import model, simsiam, resnet
+from src.models import model, resnet, simsiam
 
 load_dotenv(find_dotenv())
 
@@ -92,17 +92,19 @@ def train_simsiam(
     if linear_lr:
         learning_rate = 0.03 * batch_size / 256
 
-    train, test = model.make_dataset.load_dataset()
+    # train, test = model.make_dataset.load_dataset()
+    train = torchvision.datasets.CIFAR10(root="data/raw", train=True)
+    val = torchvision.datasets.CIFAR10(root="data/raw", train=False)
 
     transforms = process_data.get_simsiam_transforms(img_size=32)
-    train, val = process_data.train_val_split(train, 0.2)
+    # train, val = process_data.train_val_split(train, 0.2)
+    train = process_data.SimSiamDataset(train, transforms)
     val = process_data.AugmentedDataset(
         val,
         torchvision.transforms.transforms.Compose(
             process_data.cifar10_standard_transforms
         ),
     )
-    train = process_data.SimSiamDataset(train, transforms)
     trainloader_bl = torch.utils.data.DataLoader(train, batch_size=batch_size)
     valloader_bl = torch.utils.data.DataLoader(val, batch_size=batch_size)
 
@@ -120,7 +122,11 @@ def train_simsiam(
         if backbone == "resnet":
             backbone_model = resnet.ResNet18()
             projector = torch.nn.Sequential(
-                torch.nn.Linear(512, 2048),
+                torch.nn.Linear(512, embedding_size, bias=False),
+                torch.nn.BatchNorm1d(embedding_size),
+                torch.nn.ReLU(),
+                torch.nn.Linear(embedding_size, embedding_size, bias=False),
+                torch.nn.BatchNorm1d(embedding_size, affine=False),
             )
 
         elif backbone == "simpnet":
@@ -142,7 +148,9 @@ def train_simsiam(
         if debug:
             trainer = Trainer(limit_train_batches=2, limit_val_batches=2)
         else:
-            knn_callback = simsiam.KNNCallback(val_dataloader=valloader_bl, knn_k=200, top_k=[1], n_classes=10)
+            knn_callback = simsiam.KNNCallback(
+                val_dataloader=valloader_bl, knn_k=200, top_k=[1], n_classes=10
+            )
             trainer = (
                 Trainer(
                     accelerator="gpu",
@@ -156,7 +164,10 @@ def train_simsiam(
                 else Trainer(max_epochs=epochs, logger=logger)
             )
 
-        trainer.fit(simsiam_model, trainloader_bl,)
+        trainer.fit(
+            simsiam_model,
+            trainloader_bl,
+        )
         if not debug:
             wandb.finish()
 

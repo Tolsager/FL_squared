@@ -111,13 +111,13 @@ class SimpNetEncoder(nn.Module):
 
 class OurSimSiam(LightningModule):
     def __init__(
-            self,
-            backbone: torch.nn.Module,
-            projector: torch.nn.Module,
-            predictor: torch.nn.Module,
-            learning_rate: float = 0.001,
-            weight_decay: float = 0.01,
-            max_epochs: int = 100,
+        self,
+        backbone: torch.nn.Module,
+        projector: torch.nn.Module,
+        predictor: torch.nn.Module,
+        learning_rate: float = 0.001,
+        weight_decay: float = 0.01,
+        max_epochs: int = 100,
     ):
         super().__init__()
         # self.feature_dim = feature_dim
@@ -144,8 +144,8 @@ class OurSimSiam(LightningModule):
         im1, im2, image, label = batch
         prediction1, prediction2, z1, z2 = self(im1, im2)
         loss = -0.5 * (
-                self.criterion(prediction1, z2).mean()
-                + self.criterion(prediction2, z1).mean()
+            self.criterion(prediction1, z2).mean()
+            + self.criterion(prediction2, z1).mean()
         )
         self.log("train_loss", loss, on_epoch=True)
         return loss
@@ -157,13 +157,18 @@ class OurSimSiam(LightningModule):
             weight_decay=self.weight_decay,
             momentum=0.9,
         )
-        scheduler = ConsineLRScheduler(self.learning_rate, self.max_epochs)
+        scheduler = ConsineLRScheduler(optimizer, self.max_epochs)
         return [optimizer], [{"scheduler": scheduler, "interval": "epoch"}]
 
 
 class KNNCallback(Callback):
-    def __init__(self, val_dataloader: torch.utils.data.DataLoader, knn_k: int = 200, top_k: list[int] = [1],
-                 n_classes: int = 10):
+    def __init__(
+        self,
+        val_dataloader: torch.utils.data.DataLoader,
+        knn_k: int = 200,
+        top_k: list[int] = [1],
+        n_classes: int = 10,
+    ):
         self.val_dataloader = val_dataloader
         self.knn_k = knn_k
         self.top_k = top_k
@@ -214,14 +219,19 @@ def get_simsiam_predictor(embedding_dim: int = 432, hidden_dim: int = 200):
     return predictor
 
 
-class ConsineLRScheduler(torch.optim.lr_scheduler.LRScheduler):
-    def __init__(self, initial_lr: float, max_epochs: int):
-        super().__init__()
-        self.current_lr = initial_lr
+class ConsineLRScheduler(torch.optim.lr_scheduler._LRScheduler):
+    def __init__(self, optimizer, max_epochs: int, last_epoch: int = -1):
+        self.epoch = 1
         self.max_epochs = max_epochs
+        self.lr_factor = 0.5 * (1.0 + math.cos(math.pi / self.max_epochs))
+        super(ConsineLRScheduler, self).__init__(
+            optimizer, last_epoch=last_epoch, verbose=False
+        )
 
     def get_lr(self):
-        self.current_lr *= 0.5 * (
-            1.0 + math.cos(math.pi * self.last_epoch / self.max_epochs)
-        )
-        return self.current_lr
+        if self.last_epoch == 0:
+            return [group["lr"] for group in self.optimizer.param_groups]
+        factor = 0.5 * (1.0 + math.cos(math.pi * self.epoch / self.max_epochs))
+        lrs = [group["lr"] * factor for group in self.optimizer.param_groups]
+        self.epoch += 1
+        return lrs

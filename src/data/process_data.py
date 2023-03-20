@@ -9,7 +9,10 @@ from PIL import ImageFilter
 
 cifar10_standard_transforms = [
     torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)),
+    # torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)),
+    torchvision.transforms.Normalize(
+        (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
+    ),
 ]
 
 imagenet_standard_transforms = [
@@ -188,6 +191,7 @@ def get_simsiam_transforms(
 ) -> torchvision.transforms.transforms.Compose:
     augmentations = [
         torchvision.transforms.RandomResizedCrop(img_size, scale=(0.2, 1.0)),
+        torchvision.transforms.RandomHorizontalFlip(),
         torchvision.transforms.RandomApply(
             [
                 torchvision.transforms.ColorJitter(
@@ -198,7 +202,6 @@ def get_simsiam_transforms(
         ),
         torchvision.transforms.RandomGrayscale(p=0.2),
         # torchvision.transforms.RandomApply([GaussianBlur([0.1, 2.0])], p=0.5),
-        torchvision.transforms.RandomHorizontalFlip(),
     ]
     augmentations.extend(cifar10_standard_transforms)
     return torchvision.transforms.transforms.Compose(augmentations)
