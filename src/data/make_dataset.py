@@ -2,7 +2,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Tuple
 
 import click
 import torch
@@ -40,44 +40,31 @@ def download_dataset(save_path: str = "data/raw", dataset: str = "cifar10") -> N
 
 
 def load_dataset(
-    load_path: str = "data/raw", n_samples: int = None, dataset: str = "cifar10"
+    load_path: str = "data/raw",
+    n_train_samples: Optional[int] = None,
+    n_test_samples: Optional[int] = None,
+    dataset: str = "cifar10",
 ) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
-    if dataset not in ("cifar10", "imagenet"):
-        raise ValueError(f"{dataset} is not supported must be 'cifar10' or 'imagenet'")
-
-    train_dir = os.path.join(load_path, dataset, "train.pt")
-    test_dir = os.path.join(load_path, dataset, "test.pt")
-
-    if dataset == "imagenet":
-        normalization = torchvision.transforms.Normalize(
-            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+    if dataset not in DOWNLOADABLE_DATASETS:
+        raise ValueError(
+            f"{dataset} is not implemented yet.\n\
+            Available datasets: {DOWNLOADABLE_DATASETS}"
         )
-        train_transform = torchvision.transforms.Compose(
-            [
-                torchvision.transforms.RandomHorizontalFlip(),
-                torchvision.transforms.ToTensor(),
-                normalization,
-            ]
-        )
+    train_file = os.path.join(load_path, dataset, "train.pt")
+    test_file = os.path.join(load_path, dataset, "test.pt")
 
-        test_transform = torchvision.transforms.Compose(
-            [
-                torchvision.transforms.RandomHorizontalFlip(),
-                torchvision.transforms.ToTensor(),
-                normalization,
-            ]
-        )
+    train = torch.load(train_file)
+    test = torch.load(test_file)
 
-        train = train_transform(torch.load(train_dir))
-        test = test_transform(torch.load(test_dir))
-
-    else:
-        train = torch.load(train_dir)
-        test = torch.load(test_dir)
-
-    if n_samples is not None:
-        train = torch.utils.data.Subset(train, range(n_samples))
-        test = torch.utils.data.Subset(test, range(n_samples))
+    datasets = [train, test]
+    for i, n_samples, ds in enumerate(zip([n_train_samples, n_test_samples], datasets)):
+        if n_samples is not None:
+            if n_samples > len(ds):
+                raise ValueError(
+                    "The number of samples requested is larger than the dataset"
+                )
+            else:
+                datasets[i] = torch.utils.data.Subset(train, range(n_samples))
 
     return train, test
 
