@@ -9,7 +9,7 @@ import torch
 import torchvision
 from dotenv import find_dotenv, load_dotenv
 
-downloadable_datasets = {"cifar10"}
+DOWNLOADABLE_DATASETS = {"cifar10"}
 
 
 def download_dataset(save_path: str = "data/raw", dataset: str = "cifar10") -> None:
@@ -23,10 +23,10 @@ def download_dataset(save_path: str = "data/raw", dataset: str = "cifar10") -> N
     Raises:
         ValueError: dataset is not implemented
     """
-    if dataset not in downloadable_datasets:
+    if dataset not in DOWNLOADABLE_DATASETS:
         raise ValueError(
             f"{dataset} is not implemented yet.\n\
-            Available datasets: {downloadable_datasets}"
+            Available datasets: {DOWNLOADABLE_DATASETS}"
         )
     save_dir = os.path.join(save_path, dataset)
     os.makedirs(save_dir, exist_ok=True)
