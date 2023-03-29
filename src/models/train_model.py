@@ -9,7 +9,7 @@ from pytorch_lightning.loggers import WandbLogger
 import wandb
 from src import utils
 from src.data import process_data
-from src.models import model, simsiam
+from src.models import model, resnet, simsiam
 
 load_dotenv(find_dotenv())
 
@@ -92,17 +92,18 @@ def train_simsiam(
     if linear_lr:
         learning_rate = 0.03 * batch_size / 256
 
-    train, test = model.make_dataset.load_dataset()
-
-    transforms = process_data.get_simsiam_transforms(img_size=32)
-    train, val = process_data.train_val_split(train, 0.2)
-    val = process_data.AugmentedDataset(
-        val,
-        torchvision.transforms.transforms.Compose(
+    train = torchvision.datasets.CIFAR10(root="data/raw", train=True)
+    val = torchvision.datasets.CIFAR10(
+        root="data/raw",
+        train=False,
+        transform=torchvision.transforms.Compose(
             process_data.cifar10_standard_transforms
         ),
     )
+
+    transforms = process_data.get_simsiam_transforms(img_size=32)
     train = process_data.SimSiamDataset(train, transforms)
+
     trainloader_bl = torch.utils.data.DataLoader(train, batch_size=batch_size)
     valloader_bl = torch.utils.data.DataLoader(val, batch_size=batch_size)
 
@@ -112,31 +113,21 @@ def train_simsiam(
 
         if not debug:
             tags = ["simsiam", "high learning rate"]
-            notes = "memory test"
-            # notes = input("Please provide a description of the experiment:\n")
+            notes = input("Please provide a description of the experiment:\n")
             logger = WandbLogger(
                 project="rep-in-fed", entity="pydqn", tags=tags, notes=notes
             )
 
         if backbone == "resnet":
-            backbone_model = torchvision.models.resnet18()
-            backbone_model.conv1 = torch.nn.Conv2d(
-                kernel_size=3, padding=1, stride=1, in_channels=3, out_channels=64, bias=False
-            )
-            backbone_model.maxpool = torch.nn.Identity()
+            backbone_model = resnet.ResNet18()
             projector = torch.nn.Sequential(
-                torch.nn.Linear(
-                    backbone_model.fc.in_features, embedding_size, bias=False
-                ),
+                torch.nn.Linear(512, embedding_size),
                 torch.nn.BatchNorm1d(embedding_size),
-                torch.nn.ReLU(),
-                torch.nn.Linear(embedding_size, embedding_size, bias=False),
+                torch.nn.ReLU(inplace=True),
+                torch.nn.Linear(embedding_size, embedding_size),
                 torch.nn.BatchNorm1d(embedding_size, affine=False),
             )
-            # backbone_model.fc = torch.nn.Linear(
-            #     in_features=backbone_model.fc.in_features, out_features=embedding_size
-            # )
-            backbone_model.fc = torch.nn.Identity()
+
         elif backbone == "simpnet":
             backbone_model = model.SimpNet(
                 embedding_size=embedding_size, learning_rate=learning_rate
@@ -156,19 +147,26 @@ def train_simsiam(
         if debug:
             trainer = Trainer(limit_train_batches=2, limit_val_batches=2)
         else:
+            knn_callback = simsiam.KNNCallback(
+                val_dataloader=valloader_bl, knn_k=200, top_k=[1], n_classes=10
+            )
             trainer = (
                 Trainer(
                     accelerator="gpu",
                     gpus=1,
                     max_epochs=epochs,
                     logger=logger,
-                    callbacks=[simsiam.TrainFeatures()]
+                    callbacks=[knn_callback],
+                    log_every_n_steps=10,
                 )
                 if GPU
                 else Trainer(max_epochs=epochs, logger=logger)
             )
 
-        trainer.fit(simsiam_model, trainloader_bl, valloader_bl)
+        trainer.fit(
+            simsiam_model,
+            trainloader_bl,
+        )
         if not debug:
             wandb.finish()
 
