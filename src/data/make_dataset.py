@@ -2,7 +2,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import click
 import torch
@@ -67,6 +67,20 @@ def load_dataset(
                 datasets[i] = torch.utils.data.Subset(train, range(n_samples))
 
     return train, test
+
+
+def get_cifar10_dataset(
+    root: Union[str, Path],
+    train: bool = True,
+    transforms: Optional[torchvision.transforms.Compose] = None,
+) -> torch.utils.data.Dataset:
+    if train:
+        return torchvision.datasets.CIFAR10(
+            root=root, download=True, train=train, transform=transforms
+        )
+    return torchvision.datasets.CIFAR10(
+        root=root, download=True, train=train, transform=transforms
+    )
 
 
 @click.command()
