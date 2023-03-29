@@ -252,17 +252,17 @@ class Trainer:
 
 
 class SimSiam(nn.Module):
-    def __init__(self):
+    def __init__(self, embedding_size: int = 2048):
         super(SimSiam, self).__init__()
         self.backbone = SimSiam.get_backbone("resnet18")
-        out_dim = self.backbone.fc.weight.shape[1]
-        self.backbone.fc = nn.Identity()
+        out_dim = 512
+        # self.backbone.fc = nn.Identity()
 
-        self.projector = projection_MLP(out_dim, 2048, 2)
+        self.projector = projection_MLP(out_dim, embedding_size, 2)
 
         self.encoder = nn.Sequential(self.backbone, self.projector)
 
-        self.predictor = prediction_MLP(2048)
+        self.predictor = prediction_MLP(embedding_size)
 
     @staticmethod
     def get_backbone(backbone_name):

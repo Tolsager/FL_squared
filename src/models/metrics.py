@@ -61,7 +61,7 @@ class KNN:
         x_test: npt.NDArray,
         y_test: npt.NDArray,
         x_train: npt.NDArray,
-        y_train: npt.NDArra,
+        y_train: npt.NDArray,
     ):
         ys = [y_train, y_test]
         for i, y in enumerate(ys):

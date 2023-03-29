@@ -2,7 +2,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Union, Optional
 
 import click
 import torch
@@ -40,7 +40,7 @@ def download_dataset(save_path: str = "data/raw", dataset: str = "cifar10") -> N
 
 
 def load_dataset(
-    load_path: str = "data/raw", n_samples: int = None, dataset: str = "cifar10"
+        load_path: str = "data/raw", n_samples: int = None, dataset: str = "cifar10"
 ) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
     if dataset not in ("cifar10", "imagenet"):
         raise ValueError(f"{dataset} is not supported must be 'cifar10' or 'imagenet'")
@@ -80,6 +80,13 @@ def load_dataset(
         test = torch.utils.data.Subset(test, range(n_samples))
 
     return train, test
+
+
+def get_cifar10_dataset(root: Union[str, Path], train: bool = True,
+                        transforms: Optional[torchvision.transforms.Compose] = None) -> torch.utils.data.Dataset:
+    if train:
+        return torchvision.datasets.CIFAR10(root=root, download=True, train=train, transform=transforms)
+    return torchvision.datasets.CIFAR10(root=root, download=True, train=train, transform=transforms)
 
 
 @click.command()
