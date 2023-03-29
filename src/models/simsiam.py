@@ -9,8 +9,7 @@ import tqdm
 from pytorch_lightning import Callback, LightningModule
 from torch import nn
 
-from src.metrics import KNN
-from src.models.metrics import KNN
+from src.models import metrics, resnet
 
 
 class SimpNetEncoder(nn.Module):
@@ -244,7 +243,7 @@ class Trainer:
             val_features = torch.concat(val_features, dim=0).numpy()
             val_labels = torch.concat(val_labels, dim=0).numpy()
 
-            knn = KNN(n_classes=10, top_k=[1], knn_k=200)
+            knn = metrics.KNN(n_classes=10, top_k=[1], knn_k=200)
             val_acc = knn.knn_acc(
                 val_features, val_labels, train_features, train_labels
             )
