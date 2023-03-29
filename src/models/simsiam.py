@@ -206,6 +206,8 @@ class KNNCallback(Callback):
                 val_features, val_labels, train_features, train_labels
             )
 
+        pl_module.train()
+
         pl_module.log("val_acc", val_acc)
 
 
