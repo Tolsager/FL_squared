@@ -2,7 +2,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
 import click
 import torch
@@ -45,6 +45,26 @@ def load_dataset(
     n_test_samples: Optional[int] = None,
     dataset: str = "cifar10",
 ) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
+    """loads datasets
+
+    Args:
+        load_path (str, optional): directory where the dataset is
+          stored. Defaults to "data/raw".
+        n_train_samples (Optional[int], optional): number of samples
+          from the training data. Defaults to None.
+        n_test_samples (Optional[int], optional): numer of samples
+          from the test data. Defaults to None.
+        dataset (str, optional): the name of the dataset to
+          load. Defaults to "cifar10".
+
+    Raises:
+        ValueError: the dataset is not one of the implemented
+        ValueError: the dataset has not yet been downloaded
+        ValueError: the number of samples is larger than the dataset split
+
+    Returns:
+        Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]: the dataset splits
+    """
     if dataset not in DOWNLOADABLE_DATASETS:
         raise ValueError(
             f"{dataset} is not implemented yet.\n\
@@ -53,11 +73,17 @@ def load_dataset(
     train_file = os.path.join(load_path, dataset, "train.pt")
     test_file = os.path.join(load_path, dataset, "test.pt")
 
+    for file in [train_file, test_file]:
+        if not os.path.exists(file):
+            raise ValueError(f"{file} does not exist")
+
     train = torch.load(train_file)
     test = torch.load(test_file)
 
     datasets = [train, test]
-    for i, n_samples, ds in enumerate(zip([n_train_samples, n_test_samples], datasets)):
+    for i, (n_samples, ds) in enumerate(
+        zip([n_train_samples, n_test_samples], datasets)
+    ):
         if n_samples is not None:
             if n_samples > len(ds):
                 raise ValueError(
@@ -67,20 +93,6 @@ def load_dataset(
                 datasets[i] = torch.utils.data.Subset(train, range(n_samples))
 
     return train, test
-
-
-def get_cifar10_dataset(
-    root: Union[str, Path],
-    train: bool = True,
-    transforms: Optional[torchvision.transforms.Compose] = None,
-) -> torch.utils.data.Dataset:
-    if train:
-        return torchvision.datasets.CIFAR10(
-            root=root, download=True, train=train, transform=transforms
-        )
-    return torchvision.datasets.CIFAR10(
-        root=root, download=True, train=train, transform=transforms
-    )
 
 
 @click.command()
@@ -108,4 +120,5 @@ if __name__ == "__main__":
     load_dotenv(find_dotenv())
 
     # main()
-    download_dataset()
+    for dataset in DOWNLOADABLE_DATASETS:
+        download_dataset(dataset=dataset)
