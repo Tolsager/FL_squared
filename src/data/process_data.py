@@ -83,7 +83,7 @@ class DataSplitter:
         return client_datasets
 
 
-def sort_torch_dataset(
+def sort_dataset(
     dataset: torch.utils.data.Dataset, sort_fn: Callable[[Iterable], Any]
 ) -> torch.utils.data.Dataset:
     # sort the data by label
@@ -138,6 +138,63 @@ def train_val_split(
         train_split = torch.utils.data.Subset(dataset, indices[n_val_samples:])
         val_split = torch.utils.data.Subset(dataset, indices[:n_val_samples])
     return train_split, val_split
+
+
+def stratified_train_val_split(
+    dataset: torch.utils.data.Dataset, label_fn: Callable, val_size: float
+) -> Tuple[torch.utils.data.Dataset]:
+    """sorts the data and returns two stratified datasets
+
+    Expects each class to have more than one sample
+
+    Args:
+        dataset (torch.utils.data.Dataset): dataset to split
+        label_fn (Callable): function that takes a dataset sample as
+          input and returns the label
+        val_size (float): fraction of samples for validation
+
+    Returns:
+        Tuple(torch.utils.data.Dataset): stratified datasets
+    """
+    # calculate number of samples in the validation split
+    n_val_samples = int(val_size * len(dataset))
+    if n_val_samples > len(dataset):
+        raise ValueError(
+            "The validation size is larger than the samples in the dataset"
+        )
+
+    sorted_ds = sort_dataset(dataset, sort_fn=label_fn)
+    label_start_end_index = {}
+
+    last_label = None
+    for i, sample in enumerate(sorted_ds):
+        label = label_fn(sample)
+        if i == 0:
+            label_start_end_index[label] = [0]
+        elif label not in label_start_end_index:
+            label_start_end_index[last_label].append(i - 1)
+            label_start_end_index[label] = [i]
+        last_label = label
+
+    label_start_end_index[last_label].append(i)
+
+    all_train_indices = []
+    all_val_indices = []
+    for indices in label_start_end_index.values():
+        # number of samples with a specific label
+        n_samples = indices[1] - indices[0] + 1
+
+        n_val_samples = int(n_samples * val_size)
+        val_indices = list(range(indices[0], indices[0] + n_val_samples))
+        train_indices = list(range(indices[0] + n_val_samples, indices[1] + 1))
+
+        val_indices.extend(val_indices)
+        train_indices.extend(train_indices)
+
+    val_ds = torch.utils.data.Subset(dataset, all_val_indices)
+    train_ds = torch.utils.data.Subset(dataset, all_train_indices)
+
+    return train_ds, val_ds
 
 
 class AugmentedDataset(torch.utils.data.Dataset):

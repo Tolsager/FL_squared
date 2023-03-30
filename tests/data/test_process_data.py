@@ -8,7 +8,8 @@ import torchvision
 from src.data.process_data import (
     DataSplitter,
     cifar10_sort_fn,
-    sort_torch_dataset,
+    sort_dataset,
+    stratified_train_val_split,
     train_val_split,
 )
 
@@ -49,21 +50,43 @@ class TestDatasplitter:
 
 def test_sort_torch_dataset():
     sort_fn = cifar10_sort_fn
-    sorted_ds = sort_torch_dataset(dataset, sort_fn)
+    sorted_ds = sort_dataset(dataset, sort_fn)
     prev = sorted_ds[0]
     # test that the data is strictly increasing which implies that it's sorted
     for i in range(1, len(sorted_ds)):
         assert sorted_ds[i][1] >= sorted_ds[i - 1][1]
 
 
-def test_val_test_split():
+def test_train_val_split():
     dataset = torchvision.datasets.CIFAR10(
         root=save_path, train=False, transform=transforms, download=True
     )
-    ds_val, ds_test = train_val_split(dataset, 60, shuffle=True)
+    ds_train, ds_val = train_val_split(dataset, 60, shuffle=True)
 
+    assert isinstance(ds_train, torch.utils.data.dataset.Subset)
     assert isinstance(ds_val, torch.utils.data.dataset.Subset)
-    assert isinstance(ds_test, torch.utils.data.dataset.Subset)
 
-    assert len(ds_val) == 60
-    assert len(ds_test) == len(dataset) - 60
+    assert len(ds_train) == 60
+    assert len(ds_val) == len(dataset) - 60
+
+
+def test_stratified_train_val_split():
+    dataset = torchvision.datasets.CIFAR10(
+        root=save_path, train=False, transform=transforms, download=True
+    )
+    ds_train, ds_val = stratified_train_val_split(
+        dataset, val_size=0.5, label_fn=lambda x: x[1]
+    )
+
+    assert isinstance(ds_train, torch.utils.data.dataset.Subset)
+    assert isinstance(ds_val, torch.utils.data.dataset.Subset)
+
+    assert len(ds_train) - 1 < len(ds_val) < len(ds_train) + 1
+
+    label_diffs = {}
+    for (_, label_train), (_, label_val) in zip(ds_train, ds_val):
+        label_diffs[label_train] = label_diffs.get(label_train, 0) + 1
+        label_diffs[label_val] = label_diffs.get(label_val, 0) - 1
+
+    for v in label_diffs.values():
+        assert abs(v) < 2
