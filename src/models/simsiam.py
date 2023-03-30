@@ -1,11 +1,13 @@
 import math
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics
 import tqdm
+import wandb
+from torch import nn
 
 from src.models import metrics, resnet
 
@@ -138,8 +140,10 @@ class Trainer:
         learning_rate: float = 0.06,
         weight_decay: float = 5e-4,
         device: str = "cuda",
+        log: bool = False,
         validation_interval: int = 5,
     ):
+        self.log = log
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
         self.model = model.to(device)
@@ -153,6 +157,9 @@ class Trainer:
         self.avg_train_loss = torchmetrics.MeanMetric()
         self.criterion = SimSiamLoss()
         self.validation_interval = validation_interval
+
+        if self.log:
+            wandb.init(project="rep-in-fed", entity="pydqn", notes="native pytorch simsiam")
 
     def train_epoch(self) -> None:
         self.model.train()
@@ -188,9 +195,14 @@ class Trainer:
             avg_train_loss = self.avg_train_loss.compute()
             print(f"Epoch: {epoch}")
             print(f"Average train loss: {avg_train_loss}")
-            if epoch != 0 and (epoch % self.validation_interval) == 0:
+            if not self.log:
+                if epoch != 0 and (epoch % self.validation_interval) == 0:
+                    val_acc = self.validation()
+            else:
                 val_acc = self.validation()
-                print(f"Validation accuracy: {val_acc}")
+                wandb.log({"train_loss": avg_train_loss, "epoch": epoch, "top1_val_acc": val_acc})
+
+        wandb.finish()
 
     def validation(self) -> float:
         self.model.eval()
@@ -232,11 +244,11 @@ class SimSiam(nn.Module):
         self.backbone = SimSiam.get_backbone("resnet18")
         out_dim = 512
 
-        self.projector = projection_MLP(out_dim, embedding_size, 2)
+        self.projector = ProjectionMLP(out_dim, embedding_size, 2)
 
         self.encoder = nn.Sequential(self.backbone, self.projector)
 
-        self.predictor = prediction_MLP(embedding_size)
+        self.predictor = PredictionMLP(embedding_size)
 
     @staticmethod
     def get_backbone(backbone_name):
@@ -259,7 +271,7 @@ class SimSiam(nn.Module):
         return {"z1": z1, "z2": z2, "p1": p1, "p2": p2}
 
 
-class projection_MLP(nn.Module):
+class ProjectionMLP(nn.Module):
     def __init__(self, in_dim, out_dim, num_layers=2):
         super().__init__()
         hidden_dim = out_dim
@@ -292,7 +304,7 @@ class projection_MLP(nn.Module):
         return x
 
 
-class prediction_MLP(nn.Module):
+class PredictionMLP(nn.Module):
     def __init__(self, in_dim=2048):
         super().__init__()
         out_dim = in_dim
