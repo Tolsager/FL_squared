@@ -188,8 +188,8 @@ def stratified_train_val_split(
         val_indices = list(range(indices[0], indices[0] + n_val_samples))
         train_indices = list(range(indices[0] + n_val_samples, indices[1] + 1))
 
-        val_indices.extend(val_indices)
-        train_indices.extend(train_indices)
+        all_val_indices.extend(val_indices)
+        all_train_indices.extend(train_indices)
 
     val_ds = torch.utils.data.Subset(dataset, all_val_indices)
     train_ds = torch.utils.data.Subset(dataset, all_train_indices)
