@@ -34,7 +34,7 @@ def train_federated(
 @click.option("--batch_size", default=512, type=int)
 @click.option("--epochs", default=800, type=int)
 @click.option("--learning_rate", default=0.06, type=float)
-@click.option("--fraction", default= 1.0, type=float, help="fraction of data to use for training")
+@click.option("--fraction", default= 0.0, type=float, help="fraction of data to use for training")
 @click.option("--embedding-size", default=2048, type=int)
 @click.option("--backbone", default="resnet18", type=str)
 @click.option("--num_workers", default=8, type=int)
@@ -54,6 +54,9 @@ def train_simsiam(
         raise ValueError(f"Architecture {backbone} is not supported must be in {architectures}")
 
     train_ds, val_ds = make_dataset.load_dataset(dataset="cifar10")
+
+    if fraction > 0:
+        _, train_ds = process_data.stratified_train_val_split(train_ds, label_fn=process_data.cifar10_sort_fn, val_size=fraction)
 
     train_ds = process_data.SimSiamDataset(
         train_ds, process_data.get_simsiam_transforms()
