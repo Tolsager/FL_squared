@@ -32,7 +32,7 @@ def train_federated(
 
 @click.command(name="simsiam")
 @click.option("--batch-size", default=512, type=int)
-@click.option("--epochs", default=800, type=int)
+@click.option("--epochs", default=5, type=int)
 @click.option("--learning-rate", default=0.06, type=float)
 @click.option(
     "--val_frac", default=0.2, type=float, help="fraction of data used for validation"
