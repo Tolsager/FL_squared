@@ -113,3 +113,7 @@ class Server:
         for key in state_dict.keys():
             state_dict[key] = torch.zeros_like(state_dict[key])
         return state_dict
+
+
+class ClientCNN:
+    pass

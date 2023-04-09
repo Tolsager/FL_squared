@@ -198,6 +198,7 @@ class Trainer:
             if not self.log:
                 if epoch != 0 and (epoch % self.validation_interval) == 0:
                     val_acc = self.validation()
+                    print(f"Top1 Validation Accuracy: {val_acc}")
             else:
                 val_acc = self.validation()
                 wandb.log({"train_loss": avg_train_loss, "epoch": epoch, "top1_val_acc": val_acc})
