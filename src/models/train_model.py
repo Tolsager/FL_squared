@@ -5,11 +5,12 @@ import torchvision
 from dotenv import find_dotenv, load_dotenv
 
 from src.data import make_dataset, process_data
-from src.models import simsiam
+from src.models import simsiam, model
 
 load_dotenv(find_dotenv())
 
 GPU = torch.cuda.is_available()
+DEVICE = "cuda" if GPU else "cpu"
 
 
 @click.command(name="supervised")
@@ -36,6 +37,26 @@ def train_supervised(
 
     train_dl = torch.utils.data.DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_dl = torch.utils.data.DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+
+    supervised_model = model.SupervisedModel(backbone=backbone, num_classes=10)
+
+    print(f"Training on {DEVICE}")
+
+    supervised_model = supervised_model.to(DEVICE)
+
+    trainer = model.SupervisedTrainer(
+        train_dataloader=train_dl,
+        val_dataloader=val_dl,
+        model=supervised_model,
+        epochs=epochs,
+        learning_rate=learning_rate,
+        device=DEVICE,
+        log=log,
+        validation_interval=1,
+    )
+
+    trainer.train()
+
 
 
 @click.command(name="federated")
@@ -111,10 +132,9 @@ def train_simsiam(
 
     simsiam_model = simsiam.SimSiam(embedding_size=embedding_size)
 
-    device = "cuda" if GPU else "cpu"
-    print(f"Training on: {device}")
+    print(f"Training on: {DEVICE}")
 
-    simsiam_model.to(device)
+    simsiam_model.to(DEVICE)
 
     trainer = simsiam.Trainer(
         train_dl,
@@ -122,7 +142,7 @@ def train_simsiam(
         simsiam_model,
         epochs=epochs,
         learning_rate=learning_rate,
-        device=device,
+        device=DEVICE,
         log=log,
         validation_interval=1,
     )

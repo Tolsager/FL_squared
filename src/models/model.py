@@ -1,12 +1,13 @@
 import copy
 import random
-from typing import List, Tuple
+from typing import List, Tuple, Optional
+
+import resnet
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from pytorch_lightning import LightningModule, Trainer
-from torchmetrics import Accuracy
+import torchmetrics
+import tqdm
 
 import wandb
 from src.data import make_dataset, process_data
@@ -50,7 +51,7 @@ class Server:
         )
         self.client_trainers = []
 
-    def generate_clients(self) -> List[LightningModule]:
+    def generate_clients(self):
         return [copy.deepcopy(self.server_side_model) for _ in range(self.n_clients)]
 
     def do_round(self):
@@ -117,3 +118,102 @@ class Server:
 
 class ClientCNN:
     pass
+
+
+class SupervisedTrainer:
+    def __init__(
+        self,
+        train_dataloader: torch.utils.data.DataLoader,
+        val_dataloader: Optional[torch.utils.data.DataLoader],
+        model: torch.nn.Module,
+        epochs: int = 10,
+        learning_rate: float = 0.06,
+        weight_decay: float = 5e-4,
+        device: str = "cuda",
+        log: bool = False,
+        validation_interval: int = 5,
+    ):
+        self.log = log
+        self.train_dataloader = train_dataloader
+        self.val_dataloader = val_dataloader
+        self.model = model.to(device)
+        self.device = device
+        self.epochs = epochs
+        self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
+        self.optimizer = torch.optim.SGD(
+            model.parameters(), learning_rate, momentum=0.9, weight_decay=weight_decay
+        )
+        self.avg_train_loss = torchmetrics.MeanMetric()
+        self.criterion = nn.CrossEntropyLoss()
+        self.validation_interval = validation_interval
+
+        if self.log:
+            wandb.init(project="rep-in-fed", entity="pydqn", notes="native pytorch simsiam")
+
+    def train_epoch(self) -> None:
+        self.model.train()
+        for img, label in self.train_dataloader:
+            img = img.to(self.device)
+            label = label.to(self.device)
+
+            output = self.model(img)
+            loss = self.criterion(output, label)
+
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+
+            loss = loss.detach().cpu().item()
+            self.avg_train_loss.update(loss)
+
+    def train(self) -> None:
+        for epoch in tqdm.trange(self.epochs):
+            self.avg_train_loss.reset()
+            self.train_epoch()
+            avg_train_loss = self.avg_train_loss.compute()
+            print(f"Epoch: {epoch}")
+            print(f"Average train loss: {avg_train_loss}")
+            if not self.log:
+                if epoch != 0 and (epoch % self.validation_interval) == 0:
+                    val_acc = self.validation()
+                    print(f"Top1 Validation Accuracy: {val_acc}")
+            else:
+                val_acc = self.validation()
+                wandb.log({"train_loss": avg_train_loss, "epoch": epoch, "top1_val_acc": val_acc})
+
+        wandb.finish()
+
+    def validation(self) -> float:
+        self.model.eval()
+        top1 = torchmetrics.Accuracy()
+        with torch.no_grad():
+            for img, label in self.val_dataloader:
+                img = img.to(self.device)
+                label = label.to(self.device)
+                output = self.model(img)
+                top1.update(output.argmax(dim=1), label)
+
+        return top1.compute().item()
+
+
+class SupervisedModel(nn.Module):
+    def __init__(self, backbone: str = "resnet18", num_classes: int = 10):
+        super(SupervisedModel, self).__init__()
+        self.backbone = self.get_backbone(backbone)
+        self.fc = nn.Linear(512, num_classes)
+
+    @staticmethod
+    def get_backbone(backbone_name):
+        return {
+            "resnet18": resnet.ResNet18(),
+            "resnet34": resnet.ResNet34(),
+            "resnet50": resnet.ResNet50(),
+            "resnet101": resnet.ResNet101(),
+            "resnet152": resnet.ResNet152(),
+        }[backbone_name]
+
+    def forward(self, img):
+        x = self.backbone(img)
+        x = self.fc(x)
+        return x
