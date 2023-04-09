@@ -12,6 +12,31 @@ load_dotenv(find_dotenv())
 GPU = torch.cuda.is_available()
 
 
+@click.command(name="supervised")
+@click.option("--batch_size", default=512, type=int)
+@click.option("--epochs", default=100, type=int)
+@click.option("--learning_rate", default=0.001, type=float)
+@click.option("--backbone", default="resnet18", type=str)
+@click.option("--num_workers", default=8, type=int)
+@click.option("--log", is_flag=True, default=False)
+def train_supervised(
+        batch_size: int,
+        epochs: int,
+        learning_rate: float,
+        backbone: str,
+        num_workers: int,
+        log: bool
+):
+    train_ds, val_ds = make_dataset.load_dataset(dataset="cifar10")
+
+    train_ds = process_data.AugmentedDataset(train_ds, process_data.CIFAR10_STANDARD_TRANSFORMS)
+    val_ds = process_data.AugmentedDataset(val_ds, process_data.CIFAR10_STANDARD_TRANSFORMS)
+
+    train_dl = torch.utils.data.DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    val_dl = torch.utils.data.DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+
+
+
 @click.command(name="federated")
 @click.option("--batch_size", default=512, type=int)
 @click.option("--epochs", default=100, type=int)
@@ -20,12 +45,12 @@ GPU = torch.cuda.is_available()
 @click.option("--num_workers", default=8, type=int)
 @click.option("--log", is_flag=True, default=False)
 def train_federated(
-    batch_size: int,
-    epochs: int,
-    learning_rate: float,
-    backbone: str,
-    num_workers: int,
-    log: bool,
+        batch_size: int,
+        epochs: int,
+        learning_rate: float,
+        backbone: str,
+        num_workers: int,
+        log: bool,
 ):
     pass
 
@@ -42,14 +67,14 @@ def train_federated(
 @click.option("--num_workers", default=8, type=int)
 @click.option("--log", is_flag=True, default=False)
 def train_simsiam(
-    batch_size: int,
-    epochs: int,
-    learning_rate: float,
-    val_frac: float,
-    embedding_size: int,
-    backbone: str,
-    num_workers: int,
-    log: bool,
+        batch_size: int,
+        epochs: int,
+        learning_rate: float,
+        val_frac: float,
+        embedding_size: int,
+        backbone: str,
+        num_workers: int,
+        log: bool,
 ):
     architectures = {"resnet18", "resnet34", "resnet50", "resnet101", "resnet152"}
     if not (backbone in architectures):
@@ -115,14 +140,14 @@ def train_simsiam(
 )
 @click.option("--log", is_flag=True, default=False)
 def train_federated_simsiam(
-    batch_size: int,
-    epochs: int,
-    learning_rate: float,
-    embedding_size: int,
-    backbone: str,
-    num_workers: int,
-    rounds: int,
-    log: bool,
+        batch_size: int,
+        epochs: int,
+        learning_rate: float,
+        embedding_size: int,
+        backbone: str,
+        num_workers: int,
+        rounds: int,
+        log: bool,
 ):
     pass
 
