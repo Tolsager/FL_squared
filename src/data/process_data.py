@@ -7,18 +7,11 @@ import torch
 import torchvision
 from PIL import ImageFilter
 
-cifar10_standard_transforms = [
+CIFAR10_STANDARD_TRANSFORMS = [
     torchvision.transforms.ToTensor(),
     # torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261)),
     torchvision.transforms.Normalize(
         (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
-    ),
-]
-
-imagenet_standard_transforms = [
-    torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize(
-        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
     ),
 ]
 
@@ -90,7 +83,7 @@ class DataSplitter:
         return client_datasets
 
 
-def sort_torch_dataset(
+def sort_dataset(
     dataset: torch.utils.data.Dataset, sort_fn: Callable[[Iterable], Any]
 ) -> torch.utils.data.Dataset:
     # sort the data by label
@@ -108,24 +101,110 @@ def train_val_split(
     val_size: Union[int, float],
     shuffle: bool = False,
 ) -> Tuple[torch.utils.data.dataset.Subset, torch.utils.data.dataset.Subset]:
-    # TODO: DOESNT WORK AT ALL LIKE IT SHOULD
+    """splits a dataset into two splits
+
+    Args:
+        dataset (torch.utils.data.Dataset): dataset to split
+        val_size (Union[int, float]): number of samples or fraction
+          of samples to use for the val split
+        shuffle (bool, optional): shuffles the data. Defaults to False.
+
+    Raises:
+        ValueError: validation size is larger than number of samples
+
+    Returns:
+        Tuple[torch.utils.data.dataset.Subset,
+          torch.utils.data.dataset.Subset]: the splits
+    """
     if shuffle:
         indices = np.random.choice(len(dataset), len(dataset), replace=False)
     else:
         indices = range(len(dataset))
 
     if isinstance(val_size, int):
+        if val_size > len(dataset):
+            raise ValueError(
+                "The validation size is larger than the samples in the dataset"
+            )
+        train_split = torch.utils.data.Subset(dataset, indices[val_size:])
         val_split = torch.utils.data.Subset(dataset, indices[:val_size])
-        test_split = torch.utils.data.Subset(dataset, indices[val_size:])
     else:
         # calculate number of samples in the validation split
         n_val_samples = int(val_size * len(dataset))
+        if n_val_samples > len(dataset):
+            raise ValueError(
+                "The validation size is larger than the samples in the dataset"
+            )
+        train_split = torch.utils.data.Subset(dataset, indices[n_val_samples:])
         val_split = torch.utils.data.Subset(dataset, indices[:n_val_samples])
-        test_split = torch.utils.data.Subset(dataset, indices[n_val_samples:])
-    return val_split, test_split
+    return train_split, val_split
+
+
+def stratified_train_val_split(
+    dataset: torch.utils.data.Dataset, label_fn: Callable, val_size: float
+) -> Tuple[torch.utils.data.Dataset]:
+    """sorts the data and returns two stratified datasets
+
+    Expects each class to have more than one sample
+
+    Args:
+        dataset (torch.utils.data.Dataset): dataset to split
+        label_fn (Callable): function that takes a dataset sample as
+          input and returns the label
+        val_size (float): fraction of samples for validation
+
+    Returns:
+        Tuple(torch.utils.data.Dataset): stratified datasets
+    """
+    # calculate number of samples in the validation split
+    n_val_samples = int(val_size * len(dataset))
+    if n_val_samples > len(dataset):
+        raise ValueError(
+            "The validation size is larger than the samples in the dataset"
+        )
+
+    sorted_ds = sort_dataset(dataset, sort_fn=label_fn)
+    label_start_end_index = {}
+
+    last_label = None
+    for i, sample in enumerate(sorted_ds):
+        label = label_fn(sample)
+        if i == 0:
+            label_start_end_index[label] = [0]
+        elif label not in label_start_end_index:
+            label_start_end_index[last_label].append(i - 1)
+            label_start_end_index[label] = [i]
+        last_label = label
+
+    label_start_end_index[last_label].append(i)
+
+    all_train_indices = []
+    all_val_indices = []
+    for indices in label_start_end_index.values():
+        # number of samples with a specific label
+        n_samples = indices[1] - indices[0] + 1
+
+        n_val_samples = int(n_samples * val_size)
+        val_indices = list(range(indices[0], indices[0] + n_val_samples))
+        train_indices = list(range(indices[0] + n_val_samples, indices[1] + 1))
+
+        all_val_indices.extend(val_indices)
+        all_train_indices.extend(train_indices)
+
+    val_ds = torch.utils.data.Subset(dataset, all_val_indices)
+    train_ds = torch.utils.data.Subset(dataset, all_train_indices)
+
+    return train_ds, val_ds
 
 
 class AugmentedDataset(torch.utils.data.Dataset):
+    """applies a transformation to a dataset
+
+    Args:
+        dataset: dataset to augment
+        transforms: transforms to apply to the dataset
+    """
+
     def __init__(
         self,
         dataset: torch.utils.data.Dataset,
@@ -145,6 +224,14 @@ class AugmentedDataset(torch.utils.data.Dataset):
 
 
 class SimSiamDataset(AugmentedDataset):
+    """applies the augmentations to create two augmented
+      images. Also returns the unaugmented image but scaled
+
+    Args:
+        dataset: dataset to augment
+        transforms: transforms to apply to the images used for training
+    """
+
     def __init__(
         self,
         dataset: torch.utils.data.Dataset,
@@ -152,7 +239,7 @@ class SimSiamDataset(AugmentedDataset):
     ):
         super().__init__(dataset, transforms)
         self.standard_transforms = torchvision.transforms.Compose(
-            cifar10_standard_transforms
+            CIFAR10_STANDARD_TRANSFORMS
         )
 
     def __getitem__(self, i):
@@ -161,17 +248,6 @@ class SimSiamDataset(AugmentedDataset):
         aug2 = self.transforms(image)
         image = self.standard_transforms(image)
         return aug1, aug2, image, label
-
-
-def get_cifar10_transforms() -> torchvision.transforms.transforms.Compose:
-    transforms = torchvision.transforms.Compose(
-        [
-            torchvision.transforms.RandomHorizontalFlip(),
-            # Flips the image w.r.t horizontal axis
-            torchvision.transforms.RandomRotation(10),
-        ].extend(cifar10_standard_transforms)
-    )
-    return transforms
 
 
 class GaussianBlur(object):
@@ -187,7 +263,7 @@ class GaussianBlur(object):
 
 
 def get_simsiam_transforms(
-    img_size: Union[tuple[int, int], int]
+    img_size: Union[tuple[int, int], int] = 32
 ) -> torchvision.transforms.transforms.Compose:
     augmentations = [
         torchvision.transforms.RandomResizedCrop(img_size, scale=(0.2, 1.0)),
@@ -203,5 +279,5 @@ def get_simsiam_transforms(
         torchvision.transforms.RandomGrayscale(p=0.2),
         # torchvision.transforms.RandomApply([GaussianBlur([0.1, 2.0])], p=0.5),
     ]
-    augmentations.extend(cifar10_standard_transforms)
+    augmentations.extend(CIFAR10_STANDARD_TRANSFORMS)
     return torchvision.transforms.Compose(augmentations)

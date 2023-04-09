@@ -1,30 +1,17 @@
 # code taken from https://github.com/tillaczel/simsiam/blob/main/simsiam/metrics.py
 import numpy as np
+import numpy.typing as npt
 import torch
 
 
 class KNN:
-    def __init__(self, n_classes, top_k, knn_k: int = 200, knn_t: float = 0.1):
+    def __init__(
+        self, n_classes: int, top_k: list[int], knn_k: int = 200, knn_t: float = 0.1
+    ):
         self.n_classes = n_classes
         self.top_k = top_k
         self.knn_k = knn_k
         self.knn_t = knn_t
-
-    def run(
-        self,
-        f_test: np.array,
-        g_test: np.array,
-        y_test: np.array,
-        f_train: np.array,
-        g_train: np.array,
-        y_train: np.array,
-    ):
-        result = dict()
-        result.update(self.knn_acc(f_test, y_test, f_train, y_train))
-        if g_train is not None and g_test is not None:
-            result.update(self.emb_std(g_train, g_test))
-            result.update(self.emb_corr(g_train, g_test))
-        return result
 
     # knn monitor as in InstDisc https://arxiv.org/abs/1805.01978
     # implementation follows http://github.com/zhirongw/lemniscate.pytorch and
@@ -69,7 +56,13 @@ class KNN:
         pred_labels = pred_scores.argsort(dim=-1, descending=True)
         return pred_labels.numpy()
 
-    def knn_acc(self, x_test, y_test, x_train, y_train):
+    def knn_acc(
+        self,
+        x_test: npt.NDArray,
+        y_test: npt.NDArray,
+        x_train: npt.NDArray,
+        y_train: npt.NDArray,
+    ):
         ys = [y_train, y_test]
         for i, y in enumerate(ys):
             if y.ndim == 1:
@@ -85,20 +78,8 @@ class KNN:
             acc[f"full_knn_{k}"] = v
         return acc
 
-    def emb_std(self, x_train, x_test):
-        result = dict()
-        result["full_gallery_std"] = np.mean(np.std(x_train, axis=0))
-        return result
 
-    def emb_corr(self, x_train, x_test):
-        result = dict()
-        result["full_gallery_corr"] = (
-            np.mean(np.abs(np.corrcoef(x_train.T))) - 1 / x_train.shape[1]
-        )
-        return result
-
-
-def get_accuracy(pred_labels, y, top_k):
+def get_accuracy(pred_labels: np.array, y, top_k: list[int]):
     top_k_max = np.max(top_k)
     acc, same = dict(), np.zeros((pred_labels.shape[0], top_k_max))
     for k in range(top_k_max):
