@@ -1,14 +1,13 @@
 import math
-from typing import Optional, Tuple
+from typing import Optional
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics
 import tqdm
-import wandb
 from torch import nn
 
+import wandb
 from src.models import metrics, resnet
 
 
@@ -159,7 +158,9 @@ class Trainer:
         self.validation_interval = validation_interval
 
         if self.log:
-            wandb.init(project="rep-in-fed", entity="pydqn", notes="native pytorch simsiam")
+            wandb.init(
+                project="rep-in-fed", entity="pydqn", notes="native pytorch simsiam"
+            )
 
     def train_epoch(self) -> None:
         self.model.train()
@@ -196,11 +197,15 @@ class Trainer:
             print(f"Epoch: {epoch}")
             print(f"Average train loss: {avg_train_loss}")
             if not self.log:
-                if epoch != 0 and (epoch % self.validation_interval) == 0:
+                if self.validation_interval == 1 or (
+                    epoch != 0 and (epoch % self.validation_interval) == 0
+                ):
                     val_acc = self.validation()
             else:
                 val_acc = self.validation()
-                wandb.log({"train_loss": avg_train_loss, "epoch": epoch, "top1_val_acc": val_acc})
+                wandb.log(
+                    {"train_loss": avg_train_loss, "epoch": epoch, "val_acc": val_acc}
+                )
 
         wandb.finish()
 

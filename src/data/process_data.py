@@ -263,10 +263,10 @@ class GaussianBlur(object):
 
 
 def get_simsiam_transforms(
-    img_size: Union[tuple[int, int], int] = 32
+    img_size: Union[tuple[int, int], int] = 32, min_scale: float = 0.2
 ) -> torchvision.transforms.transforms.Compose:
     augmentations = [
-        torchvision.transforms.RandomResizedCrop(img_size, scale=(0.2, 1.0)),
+        torchvision.transforms.RandomResizedCrop(img_size, scale=(min_scale, 1.0)),
         torchvision.transforms.RandomHorizontalFlip(),
         torchvision.transforms.RandomApply(
             [

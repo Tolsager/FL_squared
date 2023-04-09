@@ -31,15 +31,16 @@ def train_federated(
 
 
 @click.command(name="simsiam")
-@click.option("--batch_size", default=512, type=int)
+@click.option("--batch-size", default=512, type=int)
 @click.option("--epochs", default=800, type=int)
-@click.option("--learning_rate", default=0.06, type=float)
+@click.option("--learning-rate", default=0.06, type=float)
 @click.option(
-    "--val_frac", default=0.0, type=float, help="fraction of data used for validation"
+    "--val_frac", default=0.2, type=float, help="fraction of data used for validation"
 )
 @click.option("--embedding-size", default=2048, type=int)
 @click.option("--backbone", default="resnet18", type=str)
-@click.option("--num_workers", default=8, type=int)
+@click.option("--num-workers", default=8, type=int)
+@click.option("--min-scale", default=0.2, type=float)
 @click.option("--log", is_flag=True, default=False)
 def train_simsiam(
     batch_size: int,
@@ -49,6 +50,7 @@ def train_simsiam(
     embedding_size: int,
     backbone: str,
     num_workers: int,
+    min_scale: float,
     log: bool,
 ):
     architectures = {"resnet18", "resnet34", "resnet50", "resnet101", "resnet152"}
@@ -57,18 +59,23 @@ def train_simsiam(
             f"Architecture {backbone} is not supported must be in {architectures}"
         )
 
-    train_ds, val_ds = make_dataset.load_dataset(dataset="cifar10")
+    train_ds, test_ds = make_dataset.load_dataset(dataset="cifar10")
 
+    val_dl = None
     if val_frac > 0:
-        _, train_ds = process_data.stratified_train_val_split(
+        train_ds, val_ds = process_data.stratified_train_val_split(
             train_ds, label_fn=process_data.cifar10_sort_fn, val_size=val_frac
+        )
+        val_ds = process_data.AugmentedDataset(
+            val_ds,
+            torchvision.transforms.Compose(process_data.CIFAR10_STANDARD_TRANSFORMS),
+        )
+        val_dl = torch.utils.data.DataLoader(
+            val_ds, batch_size=batch_size, num_workers=num_workers, pin_memory=True
         )
 
     train_ds = process_data.SimSiamDataset(
-        train_ds, process_data.get_simsiam_transforms()
-    )
-    val_ds = process_data.AugmentedDataset(
-        val_ds, torchvision.transforms.Compose(process_data.CIFAR10_STANDARD_TRANSFORMS)
+        train_ds, process_data.get_simsiam_transforms(min_scale=min_scale)
     )
 
     # create dataloaders
@@ -78,9 +85,6 @@ def train_simsiam(
         num_workers=num_workers,
         pin_memory=True,
         shuffle=True,
-    )
-    val_dl = torch.utils.data.DataLoader(
-        val_ds, batch_size=batch_size, num_workers=num_workers, pin_memory=True
     )
 
     simsiam_model = simsiam.SimSiam(embedding_size=embedding_size)
