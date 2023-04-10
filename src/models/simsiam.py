@@ -196,16 +196,14 @@ class Trainer:
             avg_train_loss = self.avg_train_loss.compute()
             print(f"Epoch: {epoch}")
             print(f"Average train loss: {avg_train_loss}")
-            if not self.log:
-                if self.validation_interval == 1 or (
-                    epoch != 0 and (epoch % self.validation_interval) == 0
-                ):
-                    val_acc = self.validation()
-            else:
+            if self.val_dataloader is not None and (
+                self.validation_interval == 1
+                or (epoch != 0 and (epoch % self.validation_interval) == 0)
+            ):
                 val_acc = self.validation()
-                wandb.log(
-                    {"train_loss": avg_train_loss, "epoch": epoch, "val_acc": val_acc}
-                )
+            wandb.log(
+                {"train_loss": avg_train_loss, "epoch": epoch, "val_acc": val_acc}
+            )
 
         wandb.finish()
 

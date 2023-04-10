@@ -1,9 +1,9 @@
-# import os
 import click
 import torch
 import torchvision
 from dotenv import find_dotenv, load_dotenv
 
+import wandb
 from src.data import make_dataset, process_data
 from src.models import simsiam
 
@@ -94,6 +94,10 @@ def train_simsiam(
 
     simsiam_model.to(device)
 
+    wandb.init(
+        project="rep-in-fed",
+        entity="pydqn",
+    )
     trainer = simsiam.Trainer(
         train_dl,
         val_dl,
@@ -101,7 +105,6 @@ def train_simsiam(
         epochs=epochs,
         learning_rate=learning_rate,
         device=device,
-        log=log,
         validation_interval=1,
     )
     trainer.train()
