@@ -1,14 +1,13 @@
 import math
-from typing import Optional, Tuple
+from typing import Optional
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics
 import tqdm
-import wandb
 from torch import nn
 
+import wandb
 from src.models import metrics, resnet
 
 
@@ -143,7 +142,6 @@ class Trainer:
         log: bool = False,
         validation_interval: int = 5,
     ):
-        self.log = log
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
         self.model = model.to(device)
@@ -157,9 +155,6 @@ class Trainer:
         self.avg_train_loss = torchmetrics.MeanMetric()
         self.criterion = SimSiamLoss()
         self.validation_interval = validation_interval
-
-        if self.log:
-            wandb.init(project="rep-in-fed", entity="pydqn", notes="native pytorch simsiam")
 
     def train_epoch(self) -> None:
         self.model.train()
@@ -195,12 +190,14 @@ class Trainer:
             avg_train_loss = self.avg_train_loss.compute()
             print(f"Epoch: {epoch}")
             print(f"Average train loss: {avg_train_loss}")
-            if not self.log:
-                if epoch != 0 and (epoch % self.validation_interval) == 0:
-                    val_acc = self.validation()
-            else:
+            if self.val_dataloader is not None and (
+                self.validation_interval == 1
+                or (epoch != 0 and (epoch % self.validation_interval) == 0)
+            ):
                 val_acc = self.validation()
-                wandb.log({"train_loss": avg_train_loss, "epoch": epoch, "top1_val_acc": val_acc})
+            wandb.log(
+                {"train_loss": avg_train_loss, "epoch": epoch, "val_acc": val_acc}
+            )
 
         wandb.finish()
 
