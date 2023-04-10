@@ -95,8 +95,7 @@ def train_simsiam(
     simsiam_model.to(device)
 
     wandb.init(
-        project="rep-in-fed",
-        entity="pydqn",
+        project="rep-in-fed", entity="pydqn", mode="online" if log else "disabled"
     )
     trainer = simsiam.Trainer(
         train_dl,

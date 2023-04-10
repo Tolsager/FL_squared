@@ -142,7 +142,6 @@ class Trainer:
         log: bool = False,
         validation_interval: int = 5,
     ):
-        self.log = log
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
         self.model = model.to(device)
@@ -156,11 +155,6 @@ class Trainer:
         self.avg_train_loss = torchmetrics.MeanMetric()
         self.criterion = SimSiamLoss()
         self.validation_interval = validation_interval
-
-        if self.log:
-            wandb.init(
-                project="rep-in-fed", entity="pydqn", notes="native pytorch simsiam"
-            )
 
     def train_epoch(self) -> None:
         self.model.train()
