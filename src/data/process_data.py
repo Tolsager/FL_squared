@@ -281,3 +281,24 @@ def get_simsiam_transforms(
     ]
     augmentations.extend(CIFAR10_STANDARD_TRANSFORMS)
     return torchvision.transforms.Compose(augmentations)
+
+
+def simple_datasplit(
+    dataset: torch.utils.data.Dataset, n_splits: int
+) -> list[torch.utils.data.Dataset]:
+    """splits the dataset into n_splits of the same size by
+    assigning the first sample to the first dataset, second sample
+    to the second dataset etc.
+
+    Args:
+        dataset (torch.utils.data.Dataset): dataset to split
+        n_splits (int): number of splits
+    """
+
+    datasets_idices = [[] for i in range(n_splits)]
+    n_samples = len(dataset)
+    for i in range(n_samples):
+        datasets_idices[i % n_splits].append(i)
+
+    datasets = [torch.utils.data.Subset(dataset, i) for i in datasets_idices]
+    return datasets

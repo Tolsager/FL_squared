@@ -19,7 +19,7 @@ GPU = torch.cuda.is_available()
 @click.option("--backbone", default="resnet18", type=str)
 @click.option("--num_workers", default=8, type=int)
 @click.option("--log", is_flag=True, default=False)
-def train_federated(
+def train_iid_federated(
     batch_size: int,
     epochs: int,
     learning_rate: float,
@@ -27,6 +27,40 @@ def train_federated(
     num_workers: int,
     log: bool,
 ):
+    # n_clients = 10
+    embedding_size = 2048
+    train_ds, test_ds = make_dataset.load_dataset(dataset="cifar10")
+
+    # sort train_ds
+    train_ds = process_data.sort_dataset(train_ds, process_data.cifar10_sort_fn)
+    # train_datasets = process_data.simple_datasplit(train_ds, n_clients)
+
+    train_dl = torch.utils.data.DataLoader(
+        train_ds,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=True,
+        shuffle=True,
+    )
+
+    simsiam_model = simsiam.SimSiam(embedding_size=embedding_size)
+
+    device = "cuda" if GPU else "cpu"
+
+    simsiam_model.to(device)
+
+    wandb.init(
+        project="rep-in-fed", entity="pydqn", mode="online" if log else "disabled"
+    )
+    trainer = simsiam.Trainer(
+        train_dl,
+        simsiam_model,
+        epochs=epochs,
+        learning_rate=learning_rate,
+        device=device,
+        validation_interval=1,
+    )
+    trainer.train()
     pass
 
 
@@ -138,7 +172,6 @@ def cli():
     pass
 
 
-cli.add_command(train_federated)
 cli.add_command(train_simsiam)
 cli.add_command(train_federated_simsiam)
 
