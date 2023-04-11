@@ -19,6 +19,10 @@ GPU = torch.cuda.is_available()
 @click.option("--backbone", default="resnet18", type=str)
 @click.option("--num_workers", default=8, type=int)
 @click.option("--log", is_flag=True, default=False)
+@click.option("--iid", is_flag=True, default=False, help="if the data is iid or non-iid")
+@click.option(
+    "--val_frac", default=0.2, type=float, help="fraction of data used for validation"
+)
 def train_federated(
     batch_size: int,
     epochs: int,
@@ -26,8 +30,63 @@ def train_federated(
     backbone: str,
     num_workers: int,
     log: bool,
+    iid: bool,
+    val_frac: float
 ):
-    pass
+    train_ds, test_ds = make_dataset.load_dataset(dataset="cifar10")
+
+    train_transforms = process_data.get_cifar10_transforms(min_scale=0.8, brightness=0.2, contrast=0.2, saturation=0.2, hue=0)
+    train_ds = process_data.AugmentedDataset(train_ds, train_transforms)
+
+    
+
+    val_dl = None
+    if val_frac > 0:
+        train_ds, val_ds = process_data.stratified_train_val_split(
+            train_ds, label_fn=process_data.cifar10_sort_fn, val_size=val_frac
+        )
+        val_ds = process_data.AugmentedDataset(
+            val_ds,
+            torchvision.transforms.Compose(process_data.CIFAR10_STANDARD_TRANSFORMS),
+        )
+        val_dl = torch.utils.data.DataLoader(
+            val_ds, batch_size=batch_size, num_workers=num_workers, pin_memory=True
+        )
+    
+
+
+
+
+    # create dataloaders
+    train_dl = torch.utils.data.DataLoader(
+        train_ds,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        pin_memory=True,
+        shuffle=True,
+    )
+
+    simsiam_model = simsiam.SimSiam(embedding_size=embedding_size)
+
+    device = "cuda" if GPU else "cpu"
+    print(f"Training on: {device}")
+
+    simsiam_model.to(device)
+
+    wandb.init(
+        project="rep-in-fed", entity="pydqn", mode="online" if log else "disabled"
+    )
+    trainer = simsiam.Trainer(
+        train_dl,
+        val_dl,
+        simsiam_model,
+        epochs=epochs,
+        learning_rate=learning_rate,
+        device=device,
+        validation_interval=1,
+    )
+    trainer.train()
+    
 
 
 @click.command(name="simsiam")
@@ -75,7 +134,7 @@ def train_simsiam(
         )
 
     train_ds = process_data.SimSiamDataset(
-        train_ds, process_data.get_simsiam_transforms(min_scale=min_scale)
+        train_ds, process_data.get_cifar10_transforms(min_scale=min_scale)
     )
 
     # create dataloaders

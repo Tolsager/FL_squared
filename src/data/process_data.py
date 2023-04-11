@@ -262,8 +262,8 @@ class GaussianBlur(object):
         return x
 
 
-def get_simsiam_transforms(
-    img_size: Union[tuple[int, int], int] = 32, min_scale: float = 0.2
+def get_cifar10_transforms(
+    img_size: Union[tuple[int, int], int] = 32, min_scale: float = 0.2, brightness: float = 0.4, contrast: float = 0.4, saturation: float = 0.4, hue: float = 0.1
 ) -> torchvision.transforms.transforms.Compose:
     augmentations = [
         torchvision.transforms.RandomResizedCrop(img_size, scale=(min_scale, 1.0)),
@@ -271,7 +271,7 @@ def get_simsiam_transforms(
         torchvision.transforms.RandomApply(
             [
                 torchvision.transforms.ColorJitter(
-                    0.4, 0.4, 0.4, 0.1
+                    brightness, contrast, saturation, hue
                 )  # not strengthened
             ],
             p=0.8,
@@ -281,3 +281,18 @@ def get_simsiam_transforms(
     ]
     augmentations.extend(CIFAR10_STANDARD_TRANSFORMS)
     return torchvision.transforms.Compose(augmentations)
+
+def get_fl_iid_splits(dataset: torch.utils.data.Dataset, n_splits: int) -> list[torch.utils.data.Subset]:
+    """splits a dataset sorted by label into n_splits of even size with the same label distribution.
+
+    Args:
+        dataset (torch.utils.data.Dataset): sorted dataset to split
+        n_splits (int): number of splits
+    """
+
+    split_indices = [[] for _ in range(n_splits)]
+    for i in range(len(dataset))
+        split_indices[i % n_splits].append(i)
+    
+    datasets = [torch.utils.data.Subset(dataset, indices) for indices in split_indices]
+    return datasets

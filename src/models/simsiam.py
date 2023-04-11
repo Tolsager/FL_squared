@@ -139,7 +139,6 @@ class Trainer:
         learning_rate: float = 0.06,
         weight_decay: float = 5e-4,
         device: str = "cuda",
-        log: bool = False,
         validation_interval: int = 5,
     ):
         self.train_dataloader = train_dataloader
