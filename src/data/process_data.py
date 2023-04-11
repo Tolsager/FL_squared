@@ -282,17 +282,22 @@ def get_cifar10_transforms(
     augmentations.extend(CIFAR10_STANDARD_TRANSFORMS)
     return torchvision.transforms.Compose(augmentations)
 
-def get_fl_iid_splits(dataset: torch.utils.data.Dataset, n_splits: int) -> list[torch.utils.data.Subset]:
-    """splits a dataset sorted by label into n_splits of even size with the same label distribution.
+
+def simple_datasplit(
+    dataset: torch.utils.data.Dataset, n_splits: int
+) -> list[torch.utils.data.Dataset]:
+    """splits the dataset into n_splits of the same size by
+    assigning the first sample to the first dataset, second sample
+    to the second dataset etc.
 
     Args:
-        dataset (torch.utils.data.Dataset): sorted dataset to split
+        dataset (torch.utils.data.Dataset): dataset to split
         n_splits (int): number of splits
     """
 
-    split_indices = [[] for _ in range(n_splits)]
-    for i in range(len(dataset))
-        split_indices[i % n_splits].append(i)
-    
-    datasets = [torch.utils.data.Subset(dataset, indices) for indices in split_indices]
+    datasets_idices = [[] for i in range(n_splits)]
+    for i in range(len(dataset)):
+        datasets_idices[i % n_splits].append(i)
+
+    datasets = [torch.utils.data.Subset(dataset, indices) for indices in datasets_idices]
     return datasets

@@ -19,11 +19,15 @@ GPU = torch.cuda.is_available()
 @click.option("--backbone", default="resnet18", type=str)
 @click.option("--num_workers", default=8, type=int)
 @click.option("--log", is_flag=True, default=False)
+<<<<<<< HEAD
 @click.option("--iid", is_flag=True, default=False, help="if the data is iid or non-iid")
 @click.option(
     "--val_frac", default=0.2, type=float, help="fraction of data used for validation"
 )
 def train_federated(
+=======
+def train_iid_federated(
+>>>>>>> e019bef8d2c0d640a52a4d864115002079396787
     batch_size: int,
     epochs: int,
     learning_rate: float,
@@ -33,6 +37,7 @@ def train_federated(
     iid: bool,
     val_frac: float
 ):
+<<<<<<< HEAD
     train_ds, test_ds = make_dataset.load_dataset(dataset="cifar10")
 
     train_transforms = process_data.get_cifar10_transforms(min_scale=0.8, brightness=0.2, contrast=0.2, saturation=0.2, hue=0)
@@ -58,6 +63,16 @@ def train_federated(
 
 
     # create dataloaders
+=======
+    # n_clients = 10
+    embedding_size = 2048
+    train_ds, test_ds = make_dataset.load_dataset(dataset="cifar10")
+
+    # sort train_ds
+    train_ds = process_data.sort_dataset(train_ds, process_data.cifar10_sort_fn)
+    # train_datasets = process_data.simple_datasplit(train_ds, n_clients)
+
+>>>>>>> e019bef8d2c0d640a52a4d864115002079396787
     train_dl = torch.utils.data.DataLoader(
         train_ds,
         batch_size=batch_size,
@@ -69,7 +84,10 @@ def train_federated(
     simsiam_model = simsiam.SimSiam(embedding_size=embedding_size)
 
     device = "cuda" if GPU else "cpu"
+<<<<<<< HEAD
     print(f"Training on: {device}")
+=======
+>>>>>>> e019bef8d2c0d640a52a4d864115002079396787
 
     simsiam_model.to(device)
 
@@ -78,7 +96,10 @@ def train_federated(
     )
     trainer = simsiam.Trainer(
         train_dl,
+<<<<<<< HEAD
         val_dl,
+=======
+>>>>>>> e019bef8d2c0d640a52a4d864115002079396787
         simsiam_model,
         epochs=epochs,
         learning_rate=learning_rate,
@@ -86,7 +107,11 @@ def train_federated(
         validation_interval=1,
     )
     trainer.train()
+<<<<<<< HEAD
     
+=======
+    pass
+>>>>>>> e019bef8d2c0d640a52a4d864115002079396787
 
 
 @click.command(name="simsiam")
@@ -197,7 +222,6 @@ def cli():
     pass
 
 
-cli.add_command(train_federated)
 cli.add_command(train_simsiam)
 cli.add_command(train_federated_simsiam)
 
