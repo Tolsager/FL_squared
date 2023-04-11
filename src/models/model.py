@@ -127,8 +127,8 @@ class SupervisedTrainer:
         val_dataloader: Optional[torch.utils.data.DataLoader],
         model: torch.nn.Module,
         epochs: int = 10,
-        learning_rate: float = 0.06,
-        weight_decay: float = 5e-4,
+        learning_rate: float = 0.001,
+        weight_decay: float = 1e-2,
         device: str = "cuda",
         log: bool = False,
         validation_interval: int = 5,
@@ -149,7 +149,7 @@ class SupervisedTrainer:
         self.validation_interval = validation_interval
 
         if self.log:
-            wandb.init(project="rep-in-fed", entity="pydqn", notes="native pytorch simsiam")
+            wandb.init(project="rep-in-fed", entity="pydqn", notes="")
 
     def train_epoch(self) -> None:
         self.model.train()
@@ -186,7 +186,7 @@ class SupervisedTrainer:
 
     def validation(self) -> float:
         self.model.eval()
-        top1 = torchmetrics.Accuracy()
+        top1 = torchmetrics.Accuracy().to(self.device)
         with torch.no_grad():
             for img, label in self.val_dataloader:
                 img = img.to(self.device)
@@ -201,7 +201,17 @@ class SupervisedModel(nn.Module):
     def __init__(self, backbone: str = "resnet18", num_classes: int = 10):
         super(SupervisedModel, self).__init__()
         self.backbone = self.get_backbone(backbone)
-        self.fc = nn.Linear(512, num_classes)
+        self.fc = nn.Sequential(
+            nn.Linear(512, 512),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.5),
+            nn.BatchNorm1d(512),
+            nn.Linear(512, 256),
+            nn.Dropout(p=0.5),
+            nn.ReLU(inplace=True),
+            nn.BatchNorm1d(256),
+            nn.Linear(256, num_classes),
+        )
 
     @staticmethod
     def get_backbone(backbone_name):
