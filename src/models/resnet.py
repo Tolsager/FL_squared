@@ -132,3 +132,15 @@ def ResNet101():
 
 def ResNet152():
     return ResNet(Bottleneck, [3, 8, 36, 3])
+
+
+class ResNet18Classifier(nn.Module):
+    def __init__(self, n_classes):
+        super().__init__()
+        self.resnet = ResNet18()
+        self.clf = nn.Linear(512, n_classes)
+
+    def forward(self, x):
+        x = self.resnet(x)
+        x = self.clf(x)
+        return x

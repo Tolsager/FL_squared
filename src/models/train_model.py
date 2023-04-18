@@ -8,7 +8,8 @@ from dotenv import find_dotenv, load_dotenv
 import wandb
 from src import utils
 from src.data import make_dataset, process_data
-from src.models import federated_learning, simsiam
+from src.models import federated_learning as fl
+from src.models import resnet, simsiam
 
 load_dotenv(find_dotenv())
 
@@ -16,21 +17,21 @@ GPU = torch.cuda.is_available()
 
 
 @click.command(name="federated")
-@click.option("--batch_size", default=512, type=int)
-@click.option("--epochs", default=100, type=int)
-@click.option("--learning_rate", default=0.06, type=float)
+@click.option("--batch-size", default=512, type=int)
+@click.option("--epochs", default=4, type=int)
+@click.option("--learning-rate", default=0.06, type=float)
 @click.option("--backbone", default="resnet18", type=str)
-@click.option("--num_workers", default=8, type=int)
+@click.option("--num-workers", default=8, type=int)
 @click.option("--log", is_flag=True, default=False)
 @click.option(
     "--iid", is_flag=True, default=False, help="if the data is iid or non-iid"
 )
 @click.option(
-    "--val_frac", default=0.2, type=float, help="fraction of data used for validation"
+    "--val-frac", default=0.1, type=float, help="fraction of data used for validation"
 )
 @click.option("--seed", default=0, type=int)
-@click.option("--embedding-size", default=2048, type=int)
-@click.option("--n_clients", default=10, type=int)
+@click.option("--n-clients", default=10, type=int)
+@click.option("--n-rounds", default=10, type=int)
 def train_federated(
     batch_size: int,
     epochs: int,
@@ -41,14 +42,16 @@ def train_federated(
     iid: bool,
     val_frac: float,
     seed: int,
-    embedding_size: int,
     n_clients: int,
+    n_rounds: int,
 ):
+    tags = ["debug"]
     utils.seed_everything(seed)
     train_ds, test_ds = make_dataset.load_dataset(dataset="cifar10")
 
     val_dl = None
     if val_frac > 0:
+        # stratified validation split
         train_ds, val_ds = process_data.stratified_train_val_split(
             train_ds, label_fn=process_data.cifar10_sort_fn, val_size=val_frac
         )
@@ -60,16 +63,9 @@ def train_federated(
             val_ds, batch_size=batch_size, num_workers=num_workers, pin_memory=True
         )
 
-    # create dataloaders
-    train_dl = torch.utils.data.DataLoader(
-        train_ds,
-        batch_size=batch_size,
-        num_workers=num_workers,
-        pin_memory=True,
-        shuffle=True,
+    train_transforms = torchvision.transforms.Compose(
+        process_data.CIFAR10_SUPERVISED_TRANSFORMS
     )
-
-    train_transforms = process_data.CIFAR10_SUPERVISED_TRANSFORMS
     train_ds = process_data.AugmentedDataset(train_ds, train_transforms)
 
     # sort train_ds
@@ -84,30 +80,39 @@ def train_federated(
         for ds in train_datasets
     ]
 
-    fl_model = simsiam.SimSiam(embedding_size=embedding_size)
+    fl_model = resnet.ResNet18Classifier(n_classes=10)
 
     # instantiate the client models
-    client_models = [copy.deepcopy(simsiam_model)]
+    client_models = [copy.deepcopy(fl_model) for _ in range(n_clients)]
 
     client_optimizers = [
         torch.optim.AdamW(m.parameters(), lr=learning_rate) for m in client_models
     ]
 
+    criterion = torch.nn.CrossEntropyLoss()
+
     device = "cuda" if GPU else "cpu"
+    # put models on device
+    for m in client_models:
+        m.to(device)
+
     print(f"Training on: {device}")
 
-    simsiam_model.to(device)
-
     wandb.init(
-        project="rep-in-fed", entity="pydqn", mode="online" if log else "disabled"
+        project="rep-in-fed",
+        entity="pydqn",
+        mode="online" if log else "disabled",
+        tags=tags,
     )
-    trainer = federated_learning.SupervisedTrainer(
+    trainer = fl.SupervisedTrainer(
         client_dataloaders,
         val_dl,
         client_models,
         epochs=epochs,
         device=device,
-        validation_interval=1,
+        optimizers=client_optimizers,
+        criterion=criterion,
+        rounds=n_rounds,
     )
     trainer.train()
 
@@ -222,6 +227,7 @@ def cli():
 
 cli.add_command(train_simsiam)
 cli.add_command(train_federated_simsiam)
+cli.add_command(train_federated)
 
 if __name__ == "__main__":
     cli()
