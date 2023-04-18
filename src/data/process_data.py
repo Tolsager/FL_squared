@@ -15,6 +15,12 @@ CIFAR10_STANDARD_TRANSFORMS = [
     ),
 ]
 
+CIFAR10_SUPERVISED_TRANSFORMS = [
+    torchvision.transforms.RandomHorizontalFlip(),
+    torchvision.transforms.RandomCrop((32, 32), 4),
+    torchvision.transforms.RandomRotation(10),
+] + CIFAR10_STANDARD_TRANSFORMS
+
 
 def shuffle_dataset(dataset: torch.utils.data.Dataset) -> torch.utils.data.Dataset:
     indices = np.random.choice(len(dataset), len(dataset), replace=False)
@@ -263,7 +269,12 @@ class GaussianBlur(object):
 
 
 def get_cifar10_transforms(
-    img_size: Union[tuple[int, int], int] = 32, min_scale: float = 0.2, brightness: float = 0.4, contrast: float = 0.4, saturation: float = 0.4, hue: float = 0.1
+    img_size: Union[tuple[int, int], int] = 32,
+    min_scale: float = 0.2,
+    brightness: float = 0.4,
+    contrast: float = 0.4,
+    saturation: float = 0.4,
+    hue: float = 0.1,
 ) -> torchvision.transforms.transforms.Compose:
     augmentations = [
         torchvision.transforms.RandomResizedCrop(img_size, scale=(min_scale, 1.0)),
@@ -299,5 +310,7 @@ def simple_datasplit(
     for i in range(len(dataset)):
         datasets_idices[i % n_splits].append(i)
 
-    datasets = [torch.utils.data.Subset(dataset, indices) for indices in datasets_idices]
+    datasets = [
+        torch.utils.data.Subset(dataset, indices) for indices in datasets_idices
+    ]
     return datasets
