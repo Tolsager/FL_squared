@@ -62,10 +62,10 @@ class SupervisedTrainer:
             self.models = [copy.deepcopy(server_model) for _ in range(self.n_clients)]
 
             # evaluate server model
-            self.validate(server_model)
+            # self.validate(server_model)
 
     def train_round(self):
-        for client in range(self.n_clients):
+        for client in tqdm.trange(self.n_clients):
             train_dataloader = self.client_dataloaders[client]
             model = self.models[client]
             model.train()
@@ -87,7 +87,7 @@ class SupervisedTrainer:
                 loss = float(loss)
                 self.train_loss(loss)
             avg_loss = self.train_loss.compute()
-            wandb.log({f"client{client}_train_loss": avg_loss})
+            wandb.log({f"client{client}_train_loss": avg_loss}, commit=True)
 
     def validate(self, model: torch.nn.Module):
         model.eval()
