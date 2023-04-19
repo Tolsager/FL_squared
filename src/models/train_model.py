@@ -36,7 +36,7 @@ def train_supervised(
         val_frac: float,
         seed: int,
 ):
-    tags = ["supervised", "debug"]
+    tags = ["supervised", "debug", "3 layer classifier", backbone]
     utils.seed_everything(seed)
     train_ds, test_ds = make_dataset.load_dataset(dataset="cifar10")
 
@@ -52,7 +52,7 @@ def train_supervised(
             val_ds, batch_size=batch_size, num_workers=num_workers, pin_memory=True
         )
 
-    train_transforms = torchvision.tranforms.Compose(process_data.CIFAR10_SUPERVISED_TRANSFORMS)
+    train_transforms = torchvision.transforms.Compose(process_data.CIFAR10_SUPERVISED_TRANSFORMS)
 
     train_ds = process_data.AugmentedDataset(train_ds, train_transforms)
 
@@ -65,7 +65,6 @@ def train_supervised(
     print(f"Training on {DEVICE}")
 
     supervised_model = supervised_model.to(DEVICE)
-
 
     wandb.init(
         project="rep-in-fed",

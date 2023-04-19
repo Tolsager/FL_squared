@@ -130,10 +130,8 @@ class SupervisedTrainer:
         learning_rate: float = 0.001,
         weight_decay: float = 1e-2,
         device: str = "cuda",
-        log: bool = False,
         validation_interval: int = 5,
     ):
-        self.log = log
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
         self.model = model.to(device)
@@ -147,9 +145,6 @@ class SupervisedTrainer:
         self.avg_train_loss = torchmetrics.MeanMetric()
         self.criterion = nn.CrossEntropyLoss()
         self.validation_interval = validation_interval
-
-        if self.log:
-            wandb.init(project="rep-in-fed", entity="pydqn", notes="")
 
     def train_epoch(self) -> None:
         self.model.train()
@@ -174,12 +169,9 @@ class SupervisedTrainer:
             avg_train_loss = self.avg_train_loss.compute()
             print(f"Epoch: {epoch}")
             print(f"Average train loss: {avg_train_loss}")
-            if not self.log:
-                if epoch != 0 and (epoch % self.validation_interval) == 0:
-                    val_acc = self.validation()
-                    print(f"Top1 Validation Accuracy: {val_acc}")
-            else:
+            if epoch != 0 and (epoch % self.validation_interval) == 0:
                 val_acc = self.validation()
+                print(f"Top1 Validation Accuracy: {val_acc}")
                 wandb.log({"train_loss": avg_train_loss, "epoch": epoch, "top1_val_acc": val_acc})
 
         wandb.finish()
@@ -204,10 +196,10 @@ class SupervisedModel(nn.Module):
         self.fc = nn.Sequential(
             nn.Linear(512, 512),
             nn.ReLU(inplace=True),
-            nn.Dropout(p=0.5),
+            nn.Dropout(p=0.3),
             nn.BatchNorm1d(512),
             nn.Linear(512, 256),
-            nn.Dropout(p=0.5),
+            nn.Dropout(p=0.3),
             nn.ReLU(inplace=True),
             nn.BatchNorm1d(256),
             nn.Linear(256, num_classes),
