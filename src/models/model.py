@@ -145,6 +145,7 @@ class SupervisedTrainer:
         self.avg_train_loss = torchmetrics.MeanMetric()
         self.criterion = nn.CrossEntropyLoss()
         self.validation_interval = validation_interval
+        self.val_acc = torchmetrics.Accuracy(task="multiclass", num_classes=10).to(self.device)
 
     def train_epoch(self) -> None:
         self.model.train()
@@ -169,24 +170,22 @@ class SupervisedTrainer:
             avg_train_loss = self.avg_train_loss.compute()
             print(f"Epoch: {epoch}")
             print(f"Average train loss: {avg_train_loss}")
-            if epoch != 0 and (epoch % self.validation_interval) == 0:
-                val_acc = self.validation()
-                print(f"Top1 Validation Accuracy: {val_acc}")
-                wandb.log({"train_loss": avg_train_loss, "epoch": epoch, "top1_val_acc": val_acc})
+            val_acc = self.validation()
+            wandb.log({"train_loss": avg_train_loss, "epoch": epoch, "top1_val_acc": val_acc})
 
         wandb.finish()
 
     def validation(self) -> float:
         self.model.eval()
-        top1 = torchmetrics.Accuracy().to(self.device)
+        self.val_acc.reset()
         with torch.no_grad():
             for img, label in self.val_dataloader:
                 img = img.to(self.device)
                 label = label.to(self.device)
                 output = self.model(img)
-                top1.update(output.argmax(dim=1), label)
+                self.val_acc.update(output.argmax(dim=1), label)
 
-        return top1.compute().item()
+        return self.val_acc.compute().item()
 
 
 class SupervisedModel(nn.Module):

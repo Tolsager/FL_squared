@@ -36,7 +36,7 @@ def train_supervised(
         val_frac: float,
         seed: int,
 ):
-    tags = ["supervised", "debug", "3 layer classifier", backbone]
+    tags = []
     utils.seed_everything(seed)
     train_ds, test_ds = make_dataset.load_dataset(dataset="cifar10")
 
@@ -60,7 +60,7 @@ def train_supervised(
         train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True
     )
 
-    supervised_model = model.SupervisedModel(backbone=backbone, num_classes=10)
+    supervised_model = resnet.ResNet18Classifier(n_classes=10)
 
     print(f"Training on {DEVICE}")
 
