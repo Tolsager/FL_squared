@@ -15,6 +15,12 @@ CIFAR10_STANDARD_TRANSFORMS = [
     ),
 ]
 
+CIFAR10_SUPERVISED_TRANSFORMS = [
+    torchvision.transforms.RandomHorizontalFlip(),
+    torchvision.transforms.RandomCrop((32, 32), 4),
+    torchvision.transforms.RandomRotation(10),
+] + CIFAR10_STANDARD_TRANSFORMS
+
 
 def shuffle_dataset(dataset: torch.utils.data.Dataset) -> torch.utils.data.Dataset:
     indices = np.random.choice(len(dataset), len(dataset), replace=False)
@@ -262,8 +268,13 @@ class GaussianBlur(object):
         return x
 
 
-def get_simsiam_transforms(
-    img_size: Union[tuple[int, int], int] = 32, min_scale: float = 0.2
+def get_cifar10_transforms(
+    img_size: Union[tuple[int, int], int] = 32,
+    min_scale: float = 0.2,
+    brightness: float = 0.4,
+    contrast: float = 0.4,
+    saturation: float = 0.4,
+    hue: float = 0.1,
 ) -> torchvision.transforms.transforms.Compose:
     augmentations = [
         torchvision.transforms.RandomResizedCrop(img_size, scale=(min_scale, 1.0)),
@@ -271,7 +282,7 @@ def get_simsiam_transforms(
         torchvision.transforms.RandomApply(
             [
                 torchvision.transforms.ColorJitter(
-                    0.4, 0.4, 0.4, 0.1
+                    brightness, contrast, saturation, hue
                 )  # not strengthened
             ],
             p=0.8,
@@ -281,3 +292,25 @@ def get_simsiam_transforms(
     ]
     augmentations.extend(CIFAR10_STANDARD_TRANSFORMS)
     return torchvision.transforms.Compose(augmentations)
+
+
+def simple_datasplit(
+    dataset: torch.utils.data.Dataset, n_splits: int
+) -> list[torch.utils.data.Dataset]:
+    """splits the dataset into n_splits of the same size by
+    assigning the first sample to the first dataset, second sample
+    to the second dataset etc.
+
+    Args:
+        dataset (torch.utils.data.Dataset): dataset to split
+        n_splits (int): number of splits
+    """
+
+    datasets_idices = [[] for i in range(n_splits)]
+    for i in range(len(dataset)):
+        datasets_idices[i % n_splits].append(i)
+
+    datasets = [
+        torch.utils.data.Subset(dataset, indices) for indices in datasets_idices
+    ]
+    return datasets
