@@ -85,7 +85,7 @@ def train_federated(
     # instantiate the client models
     client_models = [copy.deepcopy(fl_model) for _ in range(n_clients)]
 
-    optimizer = torch.optim.AdamW
+    optimizer = torch.optim.SGD
     criterion = torch.nn.CrossEntropyLoss()
 
     device = "cuda" if GPU else "cpu"
@@ -107,6 +107,7 @@ def train_federated(
         optimizer=optimizer,
         criterion=criterion,
         rounds=n_rounds,
+        learning_rate=learning_rate,
     )
     trainer.train()
 
