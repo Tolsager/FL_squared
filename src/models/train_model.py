@@ -90,7 +90,7 @@ def train_supervised(
 @click.command(name="federated")
 @click.option("--batch-size", default=512, type=int)
 @click.option("--epochs", default=4, type=int)
-@click.option("--learning-rate", default=0.06, type=float)
+@click.option("--learning-rate", default=0.005, type=float)
 @click.option("--backbone", default="resnet18", type=str)
 @click.option("--num-workers", default=8, type=int)
 @click.option("--log", is_flag=True, default=False)
@@ -156,15 +156,10 @@ def train_federated(
     # instantiate the client models
     client_models = [copy.deepcopy(fl_model) for _ in range(n_clients)]
 
-    client_optimizers = [
-        torch.optim.AdamW(m.parameters(), lr=learning_rate) for m in client_models
-    ]
-
+    optimizer = torch.optim.AdamW
     criterion = torch.nn.CrossEntropyLoss()
 
     # put models on device
-    for m in client_models:
-        m.to(DEVICE)
 
     print(f"Training on: {DEVICE}")
 
@@ -180,7 +175,7 @@ def train_federated(
         client_models,
         epochs=epochs,
         device=DEVICE,
-        optimizers=client_optimizers,
+        optimizer=optimizer,
         criterion=criterion,
         rounds=n_rounds,
     )

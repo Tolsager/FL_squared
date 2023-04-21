@@ -53,7 +53,7 @@ def test_supervised_trainer():
         client_models,
         epochs=epochs,
         device=device,
-        optimizers=client_optimizers,
+        optimizer=client_optimizers,
         criterion=criterion,
         rounds=rounds,
     )

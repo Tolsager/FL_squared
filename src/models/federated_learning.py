@@ -13,7 +13,7 @@ class SupervisedTrainer:
         client_dataloaders: list[torch.utils.data.DataLoader],
         val_dataloader: torch.utils.data.Dataset,
         models: list[torch.nn.Module],
-        optimizers: list[torch.optim.Optimizer],
+        optimizer: torch.optim.Optimizer,
         criterion: torch.nn.modules.loss._Loss,
         rounds: int,
         epochs: int,
@@ -23,7 +23,7 @@ class SupervisedTrainer:
         self.client_dataloaders = client_dataloaders
         self.val_dataloader = val_dataloader
         self.models = models
-        self.optimizers = optimizers
+        self.optimizer = optimizer
         self.criterion = criterion
         self.rounds = rounds
         self.epochs = epochs
@@ -46,6 +46,8 @@ class SupervisedTrainer:
     def train(self):
         server_model = copy.deepcopy(self.models[0])
         for round in tqdm.trange(self.rounds):
+            # update the optimizers with the new parameters
+            self.optimizers = [self.optimizer(m.parameters()) for m in self.models]
             self.train_round()
 
             # average client models to get the server model
@@ -65,9 +67,10 @@ class SupervisedTrainer:
             self.validate(server_model)
 
     def train_round(self):
-        for client in range(self.n_clients):
+        for client in tqdm.trange(self.n_clients):
             train_dataloader = self.client_dataloaders[client]
             model = self.models[client]
+            model.to(self.device)
             model.train()
             optimizer = self.optimizers[client]
             self.train_loss.reset()
@@ -87,9 +90,11 @@ class SupervisedTrainer:
                 loss = float(loss)
                 self.train_loss(loss)
             avg_loss = self.train_loss.compute()
-            wandb.log({f"client{client}_train_loss": avg_loss})
+            wandb.log({f"client{client}_train_loss": avg_loss}, commit=False)
+            model.to("cpu")
 
     def validate(self, model: torch.nn.Module):
+        model.to(self.device)
         model.eval()
         self.val_acc.reset()
         for image, label in self.val_dataloader:
