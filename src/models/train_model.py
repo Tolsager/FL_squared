@@ -117,7 +117,7 @@ def train_federated(
 @click.option("--epochs", default=5, type=int)
 @click.option("--learning-rate", default=0.06, type=float)
 @click.option(
-    "--val_frac", default=0.2, type=float, help="fraction of data used for validation"
+    "--val_frac", default=0.1, type=float, help="fraction of data used for validation"
 )
 @click.option("--embedding-size", default=2048, type=int)
 @click.option("--backbone", default="resnet18", type=str)
