@@ -19,6 +19,7 @@ class SupervisedTrainer:
         epochs: int,
         device: str = "cuda",
         n_classes: int = 10,
+        learning_rate: float = 0.005,
     ):
         self.client_dataloaders = client_dataloaders
         self.val_dataloader = val_dataloader
@@ -35,6 +36,7 @@ class SupervisedTrainer:
         ).to(device)
         self.train_loss = torchmetrics.MeanMetric()
         self.softmax = torch.nn.Softmax(dim=1)
+        self.learning_rate = learning_rate
 
     @property
     def neutral_state_dict(self):
@@ -47,7 +49,12 @@ class SupervisedTrainer:
         server_model = copy.deepcopy(self.models[0])
         for round in tqdm.trange(self.rounds):
             # update the optimizers with the new parameters
-            self.optimizers = [self.optimizer(m.parameters()) for m in self.models]
+            self.optimizers = [
+                self.optimizer(
+                    m.parameters(), learning_rate=self.learning_rate, weight_decay=1e-2
+                )
+                for m in self.models
+            ]
             self.train_round()
 
             # average client models to get the server model
