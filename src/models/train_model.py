@@ -1,5 +1,3 @@
-import copy
-
 import click
 import torch
 import torchvision
@@ -75,15 +73,16 @@ def train_federated(
     train_datasets = process_data.simple_datasplit(train_ds, n_clients)
     client_dataloaders = [
         torch.utils.data.DataLoader(
-            ds, batch_size=batch_size, num_workers=num_workers, pin_memory=True
+            ds,
+            batch_size=batch_size,
+            num_workers=num_workers,
+            pin_memory=True,
+            shuffle=True,
         )
         for ds in train_datasets
     ]
 
     fl_model = resnet.ResNet18Classifier(n_classes=10)
-
-    # instantiate the client models
-    client_models = [copy.deepcopy(fl_model) for _ in range(n_clients)]
 
     optimizer = torch.optim.SGD
     criterion = torch.nn.CrossEntropyLoss()
@@ -101,7 +100,7 @@ def train_federated(
     trainer = fl.SupervisedTrainer(
         client_dataloaders,
         val_dl,
-        client_models,
+        fl_model,
         epochs=epochs,
         device=device,
         optimizer=optimizer,
