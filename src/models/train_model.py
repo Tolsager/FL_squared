@@ -43,7 +43,14 @@ def train_federated(
     n_clients: int,
     n_rounds: int,
 ):
-    tags = ["debug"]
+    config = {
+        "batch_size": batch_size,
+        "learning_rate": learning_rate,
+        "n_clients": n_clients,
+        "n_rounds": n_rounds,
+    }
+    tags = ["fedavg"]
+    notes = "Finding maximum learning rate before divergence"
     utils.seed_everything(seed)
     train_ds, test_ds = make_dataset.load_dataset(dataset="cifar10")
 
@@ -96,6 +103,8 @@ def train_federated(
         entity="pydqn",
         mode="online" if log else "disabled",
         tags=tags,
+        notes=notes,
+        config=config,
     )
     trainer = fl.SupervisedTrainer(
         client_dataloaders,
