@@ -125,7 +125,7 @@ def train_federated(
 @click.option("--epochs", default=5, type=int)
 @click.option("--learning-rate", default=0.06, type=float)
 @click.option(
-    "--val_frac", default=0.1, type=float, help="fraction of data used for validation"
+    "--val-frac", default=0.1, type=float, help="fraction of data used for validation"
 )
 @click.option("--embedding-size", default=2048, type=int)
 @click.option("--backbone", default="resnet18", type=str)
@@ -143,6 +143,13 @@ def train_simsiam(
     min_scale: float,
     log: bool,
 ):
+    utils.seed_everything(0)
+    config = {
+        "batch_size": batch_size,
+        "learning_rate": learning_rate,
+    }
+    tags = ["simsiam"]
+    notes = "find optimal learning rate"
     architectures = {"resnet18", "resnet34", "resnet50", "resnet101", "resnet152"}
     if not (backbone in architectures):
         raise ValueError(
@@ -185,7 +192,12 @@ def train_simsiam(
     simsiam_model.to(device)
 
     wandb.init(
-        project="rep-in-fed", entity="pydqn", mode="online" if log else "disabled"
+        project="rep-in-fed",
+        entity="pydqn",
+        mode="online" if log else "disabled",
+        config=config,
+        notes=notes,
+        tags=tags,
     )
     trainer = simsiam.Trainer(
         train_dl,
@@ -195,6 +207,7 @@ def train_simsiam(
         learning_rate=learning_rate,
         device=device,
         validation_interval=1,
+        weight_decay=0,
     )
     trainer.train()
 
