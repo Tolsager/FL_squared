@@ -1,5 +1,3 @@
-import copy
-
 import click
 import torch
 import torchvision
@@ -45,7 +43,14 @@ def train_federated(
     n_clients: int,
     n_rounds: int,
 ):
-    tags = ["debug"]
+    config = {
+        "batch_size": batch_size,
+        "learning_rate": learning_rate,
+        "n_clients": n_clients,
+        "n_rounds": n_rounds,
+    }
+    tags = ["fedavg"]
+    notes = "Finding maximum learning rate before divergence"
     utils.seed_everything(seed)
     train_ds, test_ds = make_dataset.load_dataset(dataset="cifar10")
 
@@ -75,15 +80,16 @@ def train_federated(
     train_datasets = process_data.simple_datasplit(train_ds, n_clients)
     client_dataloaders = [
         torch.utils.data.DataLoader(
-            ds, batch_size=batch_size, num_workers=num_workers, pin_memory=True
+            ds,
+            batch_size=batch_size,
+            num_workers=num_workers,
+            pin_memory=True,
+            shuffle=True,
         )
         for ds in train_datasets
     ]
 
     fl_model = resnet.ResNet18Classifier(n_classes=10)
-
-    # instantiate the client models
-    client_models = [copy.deepcopy(fl_model) for _ in range(n_clients)]
 
     optimizer = torch.optim.SGD
     criterion = torch.nn.CrossEntropyLoss()
@@ -97,11 +103,13 @@ def train_federated(
         entity="pydqn",
         mode="online" if log else "disabled",
         tags=tags,
+        notes=notes,
+        config=config,
     )
     trainer = fl.SupervisedTrainer(
         client_dataloaders,
         val_dl,
-        client_models,
+        fl_model,
         epochs=epochs,
         device=device,
         optimizer=optimizer,
@@ -117,7 +125,7 @@ def train_federated(
 @click.option("--epochs", default=5, type=int)
 @click.option("--learning-rate", default=0.06, type=float)
 @click.option(
-    "--val_frac", default=0.2, type=float, help="fraction of data used for validation"
+    "--val-frac", default=0.1, type=float, help="fraction of data used for validation"
 )
 @click.option("--embedding-size", default=2048, type=int)
 @click.option("--backbone", default="resnet18", type=str)
@@ -135,6 +143,13 @@ def train_simsiam(
     min_scale: float,
     log: bool,
 ):
+    utils.seed_everything(0)
+    config = {
+        "batch_size": batch_size,
+        "learning_rate": learning_rate,
+    }
+    tags = ["simsiam"]
+    notes = "find optimal learning rate"
     architectures = {"resnet18", "resnet34", "resnet50", "resnet101", "resnet152"}
     if not (backbone in architectures):
         raise ValueError(
@@ -177,7 +192,12 @@ def train_simsiam(
     simsiam_model.to(device)
 
     wandb.init(
-        project="rep-in-fed", entity="pydqn", mode="online" if log else "disabled"
+        project="rep-in-fed",
+        entity="pydqn",
+        mode="online" if log else "disabled",
+        config=config,
+        notes=notes,
+        tags=tags,
     )
     trainer = simsiam.Trainer(
         train_dl,
@@ -187,6 +207,7 @@ def train_simsiam(
         learning_rate=learning_rate,
         device=device,
         validation_interval=1,
+        weight_decay=0,
     )
     trainer.train()
 
