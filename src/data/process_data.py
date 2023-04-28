@@ -314,3 +314,7 @@ def simple_datasplit(
         torch.utils.data.Subset(dataset, indices) for indices in datasets_idices
     ]
     return datasets
+
+
+def simsiam_sort_fn(batch: Tuple[torch.Tensor]) -> torch.tensor:
+    return batch[-1]

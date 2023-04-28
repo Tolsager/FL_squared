@@ -5,27 +5,28 @@ import torchmetrics
 import tqdm
 
 import wandb
+from src.models import metrics, simsiam
 
 
-class FedAvgSimSiam:
+class FedAvgSimSiamTrainer:
     def __init__(
         self,
         client_dataloaders: list[torch.utils.data.DataLoader],
         val_dataloader: torch.utils.data.Dataset,
         server_model: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
-        criterion: torch.nn.modules.loss._Loss,
         rounds: int,
         epochs: int,
         device: str = "cuda",
         n_classes: int = 10,
         learning_rate: float = 0.005,
+        validation_interval: int = 5,
     ):
         self.client_dataloaders = client_dataloaders
         self.val_dataloader = val_dataloader
         self.server_model = server_model
         self.optimizer = optimizer
-        self.criterion = criterion
+        self.criterion = simsiam.SimSiamLoss()
         self.rounds = rounds
         self.epochs = epochs
         self.device = device
@@ -34,7 +35,7 @@ class FedAvgSimSiam:
         self.train_loss = torchmetrics.MeanMetric()
         self.learning_rate = learning_rate
         self.models = [None for i in range(self.n_clients)]
-        self.scaler = torch.cuda.amp.GradScaler()
+        self.validation_interval = validation_interval
 
     @property
     def neutral_state_dict(self):
@@ -62,7 +63,12 @@ class FedAvgSimSiam:
             self.server_model.load_state_dict(avg_state_dict)
 
             # evaluate server model
-            self.validate(self.server_model)
+            if self.val_dataloader is not None and (
+                self.validation_interval == 1
+                or (round != 0 and (round % self.validation_interval) == 0)
+            ):
+                val_acc = self.validate()
+                wandb.log({"val_acc": val_acc})
         return self.server_model
 
     def train_round(self):
@@ -76,16 +82,18 @@ class FedAvgSimSiam:
             )
             self.train_loss.reset()
             for epoch in range(self.epochs):
-                for image, label in train_dataloader:
-                    image = image.to(self.device)
+                for aug1, aug2, _, _ in train_dataloader:
+                    aug1 = aug1.to(self.device)
+                    aug2 = aug2.to(self.device)
+                    model_outputs = model(aug1, aug2)
+                    loss = self.criterion(
+                        model_outputs["z1"],
+                        model_outputs["z2"],
+                        model_outputs["p1"],
+                        model_outputs["p2"],
+                    )
 
-                    logits = model(image)
-                    del image
-                    label = label.to(self.device)
-                    loss = self.criterion(logits, label)
-                    del logits
-                    del label
-
+                    # optimization
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
@@ -99,23 +107,38 @@ class FedAvgSimSiam:
             model.to("cpu")
             self.models[client] = model
 
-    def validate(self, model: torch.nn.Module):
-        model.to(self.device)
-        model.eval()
-        self.val_acc.reset()
-        for image, label in self.val_dataloader:
-            image = image.to(self.device)
+    def validate(self):
+        self.server_model.eval()
+        self.server_model.to(self.device)
+        train_features = []
+        train_labels = []
+        val_features = []
+        val_labels = []
 
-            logits = model(image)
-            del image
-            out = torch.argmax(logits, dim=1)
+        with torch.no_grad():
+            for train_dataloader in self.client_dataloaders:
+                for batch in train_dataloader:
+                    _, _, img, label = batch
+                    img = img.to(self.device)
+                    train_features.append(self.server_model.backbone(img).cpu())
+                    train_labels.append(label.cpu())
 
-            label = label.to(self.device)
-            self.val_acc(out, label)
-            del out
-            del label
+            train_features = torch.concat(train_features, dim=0).numpy()
+            train_labels = torch.concat(train_labels, dim=0).numpy()
 
-        val_acc = self.val_acc.compute()
-        print(f"val_acc: {val_acc}")
-        wandb.log({"val_acc": val_acc})
-        model.to("cpu")
+            for batch in self.val_dataloader:
+                img, label = batch
+                img = img.cuda()
+                val_features.append(self.server_model.backbone(img).cpu())
+                val_labels.append(label.cpu())
+            self.server_model.to("cpu")
+
+            val_features = torch.concat(val_features, dim=0).numpy()
+            val_labels = torch.concat(val_labels, dim=0).numpy()
+
+            knn = metrics.KNN(n_classes=10, top_k=[1], knn_k=200)
+            val_acc = knn.knn_acc(
+                val_features, val_labels, train_features, train_labels
+            )
+
+        return list(val_acc.values())[0]
