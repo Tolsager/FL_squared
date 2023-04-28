@@ -148,7 +148,12 @@ def train_federated(
     train_ds = process_data.sort_dataset(train_ds, process_data.cifar10_sort_fn)
 
     # split the data to the clients
-    train_datasets = process_data.simple_datasplit(train_ds, n_clients)
+    if iid:
+        train_datasets = process_data.simple_datasplit(train_ds, n_clients)
+    else:
+        datasplitter = process_data.DataSplitter(train_ds, n_clients, shards_per_client=2)
+        train_datasets = datasplitter.split_data()
+
     client_dataloaders = [
         torch.utils.data.DataLoader(
             ds,
