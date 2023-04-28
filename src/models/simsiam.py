@@ -233,7 +233,6 @@ class Trainer:
 
         return list(val_acc.values())[0]
 
-
 class SimSiam(nn.Module):
     def __init__(self, embedding_size: int = 2048):
         super(SimSiam, self).__init__()

@@ -148,7 +148,7 @@ def train_val_split(
 
 def stratified_train_val_split(
     dataset: torch.utils.data.Dataset, label_fn: Callable, val_size: float
-) -> Tuple[torch.utils.data.Dataset]:
+) -> Tuple[torch.utils.data.Dataset, torch.utils.data.Dataset]:
     """sorts the data and returns two stratified datasets
 
     Expects each class to have more than one sample

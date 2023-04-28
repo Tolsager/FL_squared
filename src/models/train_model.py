@@ -8,11 +8,82 @@ from src import utils
 from src.data import make_dataset, process_data
 from src.models import federated_learning as fl
 from src.models import federated_simsiam as fss
-from src.models import resnet, simsiam
+from src.models import resnet, simsiam, model
 
 load_dotenv(find_dotenv())
 
 GPU = torch.cuda.is_available()
+DEVICE = "cuda" if GPU else "cpu"
+
+
+@click.command(name="supervised")
+@click.option("--batch-size", default=512, type=int)
+@click.option("--epochs", default=100, type=int)
+@click.option("--learning-rate", default=0.001, type=float)
+@click.option("--backbone", default="resnet18", type=str)
+@click.option("--num-workers", default=8, type=int)
+@click.option("--log", is_flag=True, default=False)
+@click.option("--val-frac", default=0.1, type=float)
+@click.option("--seed", default=0, type=int)
+def train_supervised(
+        batch_size: int,
+        epochs: int,
+        learning_rate: float,
+        backbone: str,
+        num_workers: int,
+        log: bool,
+        val_frac: float,
+        seed: int,
+):
+    tags = []
+    utils.seed_everything(seed)
+    train_ds, test_ds = make_dataset.load_dataset(dataset="cifar10")
+
+    val_dl = None
+    if val_frac > 0:
+        train_ds, val_ds = process_data.train_val_split(train_ds, val_frac)
+
+        val_transforms = torchvision.transforms.Compose(process_data.CIFAR10_STANDARD_TRANSFORMS)
+
+        val_ds = process_data.AugmentedDataset(val_ds, val_transforms)
+
+        val_dl = torch.utils.data.DataLoader(
+            val_ds, batch_size=batch_size, num_workers=num_workers, pin_memory=True
+        )
+
+    train_transforms = torchvision.transforms.Compose(process_data.CIFAR10_SUPERVISED_TRANSFORMS)
+
+    train_ds = process_data.AugmentedDataset(train_ds, train_transforms)
+
+    train_dl = torch.utils.data.DataLoader(
+        train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True
+    )
+
+    supervised_model = resnet.ResNet18Classifier(n_classes=10)
+
+    print(f"Training on {DEVICE}")
+
+    supervised_model = supervised_model.to(DEVICE)
+
+    wandb.init(
+        project="rep-in-fed",
+        entity="pydqn",
+        mode="online" if log else "disabled",
+        tags=tags,
+    )
+
+    trainer = model.SupervisedTrainer(
+        train_dataloader=train_dl,
+        val_dataloader=val_dl,
+        model=supervised_model,
+        epochs=epochs,
+        learning_rate=learning_rate,
+        device=DEVICE,
+        validation_interval=1,
+    )
+
+    trainer.train()
+
 
 
 @click.command(name="federated")
@@ -78,7 +149,12 @@ def train_federated(
     train_ds = process_data.sort_dataset(train_ds, process_data.cifar10_sort_fn)
 
     # split the data to the clients
-    train_datasets = process_data.simple_datasplit(train_ds, n_clients)
+    if iid:
+        train_datasets = process_data.simple_datasplit(train_ds, n_clients)
+    else:
+        datasplitter = process_data.DataSplitter(train_ds, n_clients, shards_per_client=2)
+        train_datasets = datasplitter.split_data()
+
     client_dataloaders = [
         torch.utils.data.DataLoader(
             ds,
@@ -95,9 +171,9 @@ def train_federated(
     optimizer = torch.optim.SGD
     criterion = torch.nn.CrossEntropyLoss()
 
-    device = "cuda" if GPU else "cpu"
+    # put models on device
 
-    print(f"Training on: {device}")
+    print(f"Training on: {DEVICE}")
 
     wandb.init(
         project="rep-in-fed",
@@ -112,7 +188,7 @@ def train_federated(
         val_dl,
         fl_model,
         epochs=epochs,
-        device=device,
+        device=DEVICE,
         optimizer=optimizer,
         criterion=criterion,
         rounds=n_rounds,
@@ -187,10 +263,9 @@ def train_simsiam(
 
     simsiam_model = simsiam.SimSiam(embedding_size=embedding_size)
 
-    device = "cuda" if GPU else "cpu"
-    print(f"Training on: {device}")
+    print(f"Training on: {DEVICE}")
 
-    simsiam_model.to(device)
+    simsiam_model.to(DEVICE)
 
     wandb.init(
         project="rep-in-fed",
@@ -206,7 +281,7 @@ def train_simsiam(
         simsiam_model,
         epochs=epochs,
         learning_rate=learning_rate,
-        device=device,
+        device=DEVICE,
         validation_interval=1,
         weight_decay=0,
     )
@@ -220,14 +295,16 @@ def train_simsiam(
 @click.option("--embedding-size", default=2048, type=int)
 @click.option("--backbone", default="resnet18", type=str)
 @click.option("--num-workers", default=8, type=int)
-@click.option(
-    "--rounds", default=5, type=int, help="Number of training rounds clients to perform"
-)
 @click.option("--log", is_flag=True, default=False)
+@click.option(
+    "--iid", is_flag=True, default=False, help="if the data is iid or non-iid"
+)
 @click.option(
     "--val-frac", default=0.1, type=float, help="fraction of data used for validation"
 )
+@click.option("--seed", default=0, type=int)
 @click.option("--n-clients", default=10, type=int)
+@click.option("--rounds", default=5, type=int, help="Number of training rounds clients to perform")
 @click.option("--validation-interval", default=1, type=int)
 def train_federated_simsiam(
     batch_size: int,
@@ -236,13 +313,15 @@ def train_federated_simsiam(
     embedding_size: int,
     backbone: str,
     num_workers: int,
-    rounds: int,
     log: bool,
+    iid: bool,
     val_frac: float,
+    seed: int,
     n_clients: int,
+    rounds: int,
     validation_interval: int,
 ):
-    utils.seed_everything(0)
+    utils.seed_everything(seed)
     config = {
         "batch_size": batch_size,
         "learning_rate": learning_rate,
@@ -278,7 +357,12 @@ def train_federated_simsiam(
     train_ds = process_data.sort_dataset(train_ds, process_data.simsiam_sort_fn)
 
     # split the data to the clients
-    train_datasets = process_data.simple_datasplit(train_ds, n_clients)
+    if iid:
+        train_datasets = process_data.simple_datasplit(train_ds, n_clients)
+    else:
+        datasplitter = process_data.DataSplitter(train_ds, n_clients, shards_per_client=2)
+        train_datasets = datasplitter.split_data()
+
     client_dataloaders = [
         torch.utils.data.DataLoader(
             ds,
@@ -300,7 +384,7 @@ def train_federated_simsiam(
         optimizer,
         rounds,
         epochs,
-        "cuda" if GPU else "cpu",
+        device=DEVICE,
         learning_rate=learning_rate,
         validation_interval=validation_interval,
     )
@@ -320,6 +404,7 @@ def cli():
     pass
 
 
+cli.add_command(train_supervised)
 cli.add_command(train_simsiam)
 cli.add_command(train_federated_simsiam)
 cli.add_command(train_federated)
