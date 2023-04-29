@@ -37,7 +37,6 @@ class SupervisedTrainer:
         self.train_loss = torchmetrics.MeanMetric()
         self.learning_rate = learning_rate
         self.models = [None for i in range(self.n_clients)]
-        self.scaler = torch.cuda.amp.GradScaler()
 
     @property
     def neutral_state_dict(self):
@@ -83,11 +82,11 @@ class SupervisedTrainer:
                     image = image.to(self.device)
 
                     logits = model(image)
-                    del image
+                    # del image
                     label = label.to(self.device)
                     loss = self.criterion(logits, label)
-                    del logits
-                    del label
+                    # del logits
+                    # del label
 
                     optimizer.zero_grad()
                     loss.backward()
@@ -110,13 +109,13 @@ class SupervisedTrainer:
             image = image.to(self.device)
 
             logits = model(image)
-            del image
+            # del image
             out = torch.argmax(logits, dim=1)
 
             label = label.to(self.device)
             self.val_acc(out, label)
-            del out
-            del label
+            # del out
+            # del label
 
         val_acc = self.val_acc.compute()
         print(f"val_acc: {val_acc}")

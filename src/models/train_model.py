@@ -99,7 +99,6 @@ def train_supervised(
 @click.option("--batch-size", default=512, type=int)
 @click.option("--epochs", default=4, type=int)
 @click.option("--learning-rate", default=0.005, type=float)
-@click.option("--backbone", default="resnet18", type=str)
 @click.option("--num-workers", default=8, type=int)
 @click.option("--log", is_flag=True, default=False)
 @click.option(
@@ -111,11 +110,12 @@ def train_supervised(
 @click.option("--seed", default=0, type=int)
 @click.option("--n-clients", default=10, type=int)
 @click.option("--n-rounds", default=10, type=int)
+@click.option("--sweep", is_flag=True, default=False)
+@click.option("--total-epochs", type=int, default=40)
 def train_federated(
     batch_size: int,
     epochs: int,
     learning_rate: float,
-    backbone: str,
     num_workers: int,
     log: bool,
     iid: bool,
@@ -123,7 +123,13 @@ def train_federated(
     seed: int,
     n_clients: int,
     n_rounds: int,
+    sweep: bool,
+    total_epochs: int,
 ):
+    if sweep:
+        epochs = epochs * 2
+        n_rounds = total_epochs / epochs
+
     config = {
         "batch_size": batch_size,
         "learning_rate": learning_rate,
