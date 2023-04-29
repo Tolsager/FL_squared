@@ -8,7 +8,7 @@ from src import utils
 from src.data import make_dataset, process_data
 from src.models import federated_learning as fl
 from src.models import federated_simsiam as fss
-from src.models import resnet, simsiam, model
+from src.models import model, resnet, simsiam
 
 load_dotenv(find_dotenv())
 
@@ -26,24 +26,29 @@ DEVICE = "cuda" if GPU else "cpu"
 @click.option("--val-frac", default=0.1, type=float)
 @click.option("--seed", default=0, type=int)
 def train_supervised(
-        batch_size: int,
-        epochs: int,
-        learning_rate: float,
-        backbone: str,
-        num_workers: int,
-        log: bool,
-        val_frac: float,
-        seed: int,
+    batch_size: int,
+    epochs: int,
+    learning_rate: float,
+    backbone: str,
+    num_workers: int,
+    log: bool,
+    val_frac: float,
+    seed: int,
 ):
-    tags = []
+    tags = ["debug"]
     utils.seed_everything(seed)
     train_ds, test_ds = make_dataset.load_dataset(dataset="cifar10")
 
     val_dl = None
     if val_frac > 0:
-        train_ds, val_ds = process_data.train_val_split(train_ds, val_frac)
+        train_ds = process_data.sort_dataset(train_ds, process_data.cifar10_sort_fn)
+        train_ds, val_ds = process_data.stratified_train_val_split(
+            train_ds, process_data.cifar10_sort_fn, val_frac
+        )
 
-        val_transforms = torchvision.transforms.Compose(process_data.CIFAR10_STANDARD_TRANSFORMS)
+        val_transforms = torchvision.transforms.Compose(
+            process_data.CIFAR10_STANDARD_TRANSFORMS
+        )
 
         val_ds = process_data.AugmentedDataset(val_ds, val_transforms)
 
@@ -51,12 +56,18 @@ def train_supervised(
             val_ds, batch_size=batch_size, num_workers=num_workers, pin_memory=True
         )
 
-    train_transforms = torchvision.transforms.Compose(process_data.CIFAR10_SUPERVISED_TRANSFORMS)
+    train_transforms = torchvision.transforms.Compose(
+        process_data.CIFAR10_SUPERVISED_TRANSFORMS
+    )
 
     train_ds = process_data.AugmentedDataset(train_ds, train_transforms)
 
     train_dl = torch.utils.data.DataLoader(
-        train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True
+        train_ds,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=True,
     )
 
     supervised_model = resnet.ResNet18Classifier(n_classes=10)
@@ -79,11 +90,9 @@ def train_supervised(
         epochs=epochs,
         learning_rate=learning_rate,
         device=DEVICE,
-        validation_interval=1,
     )
 
     trainer.train()
-
 
 
 @click.command(name="federated")
@@ -152,7 +161,9 @@ def train_federated(
     if iid:
         train_datasets = process_data.simple_datasplit(train_ds, n_clients)
     else:
-        datasplitter = process_data.DataSplitter(train_ds, n_clients, shards_per_client=2)
+        datasplitter = process_data.DataSplitter(
+            train_ds, n_clients, shards_per_client=2
+        )
         train_datasets = datasplitter.split_data()
 
     client_dataloaders = [
@@ -304,7 +315,9 @@ def train_simsiam(
 )
 @click.option("--seed", default=0, type=int)
 @click.option("--n-clients", default=10, type=int)
-@click.option("--rounds", default=5, type=int, help="Number of training rounds clients to perform")
+@click.option(
+    "--rounds", default=5, type=int, help="Number of training rounds clients to perform"
+)
 @click.option("--validation-interval", default=1, type=int)
 def train_federated_simsiam(
     batch_size: int,
@@ -360,7 +373,9 @@ def train_federated_simsiam(
     if iid:
         train_datasets = process_data.simple_datasplit(train_ds, n_clients)
     else:
-        datasplitter = process_data.DataSplitter(train_ds, n_clients, shards_per_client=2)
+        datasplitter = process_data.DataSplitter(
+            train_ds, n_clients, shards_per_client=2
+        )
         train_datasets = datasplitter.split_data()
 
     client_dataloaders = [
