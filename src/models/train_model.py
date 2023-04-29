@@ -325,6 +325,8 @@ def train_simsiam(
     "--rounds", default=5, type=int, help="Number of training rounds clients to perform"
 )
 @click.option("--validation-interval", default=1, type=int)
+@click.option("--sweep", is_flag=True, default=False)
+@click.option("--total-epochs", type=int, default=40)
 def train_federated_simsiam(
     batch_size: int,
     epochs: int,
@@ -339,7 +341,13 @@ def train_federated_simsiam(
     n_clients: int,
     rounds: int,
     validation_interval: int,
+    sweep: bool,
+    total_epochs: int,
 ):
+    if sweep:
+        epoch_map = {1: 4, 2: 5, 3: 8, 4: 10, 5: 20}
+        epochs = epoch_map[epochs]
+        rounds = total_epochs // epochs
     utils.seed_everything(seed)
     config = {
         "batch_size": batch_size,

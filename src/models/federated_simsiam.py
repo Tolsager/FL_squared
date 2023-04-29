@@ -78,7 +78,10 @@ class FedAvgSimSiamTrainer:
             model.to(self.device)
             model.train()
             optimizer = self.optimizer(
-                model.parameters(), lr=self.learning_rate, weight_decay=0
+                model.parameters(),
+                lr=self.learning_rate,
+                weight_decay=0.0005,
+                momentum=0.9,
             )
             self.train_loss.reset()
             for epoch in range(self.epochs):
