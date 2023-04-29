@@ -301,7 +301,6 @@ def train_simsiam(
         learning_rate=learning_rate,
         device=DEVICE,
         validation_interval=1,
-        weight_decay=0,
     )
     trainer.train()
 
