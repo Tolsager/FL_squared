@@ -127,7 +127,8 @@ def train_federated(
     total_epochs: int,
 ):
     if sweep:
-        epochs = epochs * 2
+        epoch_map = {1: 4, 2: 5, 3: 8, 4: 10, 5: 20}
+        epochs = epoch_map[epochs]
         n_rounds = total_epochs / epochs
 
     config = {
