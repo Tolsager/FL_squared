@@ -61,7 +61,7 @@ class SupervisedTrainer:
             print(f"Average train loss: {avg_train_loss}")
             val_acc = self.validation()
             wandb.log(
-                {"train_loss": avg_train_loss, "epoch": epoch, "top1_val_acc": val_acc}
+                {"train_loss": avg_train_loss, "epoch": epoch, "val_acc": val_acc}
             )
 
         wandb.finish()
