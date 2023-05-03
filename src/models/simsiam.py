@@ -233,8 +233,9 @@ class Trainer:
 
         return list(val_acc.values())[0]
 
+
 class SimSiam(nn.Module):
-    def __init__(self, embedding_size: int = 2048):
+    def __init__(self, embedding_size: int = 2048, n_classes: int = 10):
         super(SimSiam, self).__init__()
         self.backbone = SimSiam.get_backbone("resnet18")
         out_dim = 512
@@ -244,6 +245,8 @@ class SimSiam(nn.Module):
         self.encoder = nn.Sequential(self.backbone, self.projector)
 
         self.predictor = PredictionMLP(embedding_size)
+
+        self.clf = nn.Linear(512, n_classes)
 
     @staticmethod
     def get_backbone(backbone_name):
@@ -255,10 +258,12 @@ class SimSiam(nn.Module):
             "resnet152": resnet.ResNet152(),
         }[backbone_name]
 
-    def forward(self, im_aug1, im_aug2):
-
-        z1 = self.encoder(im_aug1)
-        z2 = self.encoder(im_aug2)
+    def forward(self, im1, im2=None):
+        if im2 is None:
+            encoding = self.backbone(im1)
+            return self.clf(encoding)
+        z1 = self.encoder(im1)
+        z2 = self.encoder(im2)
 
         p1 = self.predictor(z1)
         p2 = self.predictor(z2)
