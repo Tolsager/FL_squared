@@ -478,29 +478,33 @@ def train_federated_supervised_simsiam(
     # sort train_ds
     train_ds = process_data.sort_dataset(train_ds, process_data.simsiam_sort_fn)
 
-    supervised_dataset = process_data.get_stratified_subset(
-        train_ds, process_data.cifar10_sort_fn, 0.1
-    )
-
-    supervised_dataset = process_data.SimSiamDataset(
-        supervised_dataset, process_data.get_cifar10_transforms()
-    )
-    supervised_dataloader = torch.utils.data.DataLoader(
-        supervised_dataset, shuffle=True, pin_memory=True
-    )
-
-    train_ds = process_data.SimSiamDataset(
-        train_ds, process_data.get_cifar10_transforms()
-    )
-
     # split the data to the clients
     if iid:
         train_datasets = process_data.simple_datasplit(train_ds, n_clients)
+        supervised_dataset = process_data.get_stratified_subset(
+            train_ds, process_data.cifar10_sort_fn, 0.1
+        )
     else:
         datasplitter = process_data.DataSplitter(
             train_ds, n_clients, shards_per_client=2
         )
         train_datasets = datasplitter.split_data()
+        supervised_dataset = torch.concat(
+            [process_data.get_random_subset(ds, 0.1) for ds in train_datasets]
+        )
+        supervised_dataset = process_data.AugmentedDataset(
+            supervised_dataset,
+            torchvision.transforms.Compose(process_data.CIFAR10_STANDARD_TRANSFORMS),
+        )
+
+    supervised_dataloader = torch.utils.data.DataLoader(
+        supervised_dataset, shuffle=True, pin_memory=True
+    )
+
+    train_datasets = [
+        process_data.SimSiamDataset(ds, process_data.get_cifar10_transforms())
+        for ds in train_datasets
+    ]
 
     client_dataloaders = [
         torch.utils.data.DataLoader(

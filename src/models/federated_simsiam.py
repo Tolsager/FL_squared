@@ -234,12 +234,15 @@ class FedAvgSimSiamFinetuningTrainer:
                     aug1 = aug1.to(self.device)
                     aug2 = aug2.to(self.device)
                     model_outputs = model(aug1, aug2)
+                    del aug1
+                    del aug2
                     loss = self.criterion(
                         model_outputs["z1"],
                         model_outputs["z2"],
                         model_outputs["p1"],
                         model_outputs["p2"],
                     )
+                    del model_outputs
 
                     # optimization
                     optimizer.zero_grad()

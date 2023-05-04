@@ -342,3 +342,9 @@ def get_stratified_subset(
             labels_start_indices[i] += 1
 
     return torch.utils.data.Subset(ds, subset_indices)
+
+
+def get_random_subset(ds: torch.utils.data.Dataset, frac: float):
+    n_samples = int(len(ds) * frac)
+    indices = np.random.choice(len(ds), n_samples, replace=False)
+    return torch.utils.data.Subset(ds, indices)
