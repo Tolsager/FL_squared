@@ -298,7 +298,7 @@ def train_simsiam(
 
 
 @click.command(name="FL2")
-@click.option("--batch_size", default=512, type=int)
+@click.option("--batch-size", default=512, type=int)
 @click.option("--epochs", default=5, type=int)
 @click.option("--learning-rate", default=0.06, type=float)
 @click.option("--embedding-size", default=2048, type=int)
@@ -413,7 +413,7 @@ def train_federated_simsiam(
 
 
 @click.command(name="FLS")
-@click.option("--batch_size", default=512, type=int)
+@click.option("--batch-size", default=512, type=int)
 @click.option("--epochs", default=4, type=int)
 @click.option("--learning-rate", default=0.06, type=float)
 @click.option("--supervised-learning-rate", default=0.06, type=float)
