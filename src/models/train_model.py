@@ -414,7 +414,8 @@ def train_federated_simsiam(
 
 @click.command(name="FLS")
 @click.option("--batch-size", default=512, type=int)
-@click.option("--epochs", default=4, type=int)
+@click.option("--local-epochs", default=4, type=int)
+@click.option("--supervised-epochs", default=5, type=int)
 @click.option("--learning-rate", default=0.06, type=float)
 @click.option("--supervised-learning-rate", default=0.06, type=float)
 @click.option("--embedding-size", default=2048, type=int)
@@ -434,7 +435,8 @@ def train_federated_simsiam(
 )
 def train_federated_supervised_simsiam(
     batch_size: int,
-    epochs: int,
+    local_epochs: int,
+    supervised_epochs: int,
     learning_rate: float,
     supervised_learning_rate: float,
     embedding_size: int,
@@ -489,14 +491,14 @@ def train_federated_supervised_simsiam(
             train_ds, n_clients, shards_per_client=2
         )
         train_datasets = datasplitter.split_data()
-        supervised_dataset = torch.concat(
+        supervised_dataset = torch.utils.data.ConcatDataset(
             [process_data.get_random_subset(ds, 0.1) for ds in train_datasets]
         )
-        supervised_dataset = process_data.AugmentedDataset(
-            supervised_dataset,
-            torchvision.transforms.Compose(process_data.CIFAR10_STANDARD_TRANSFORMS),
-        )
 
+    supervised_dataset = process_data.AugmentedDataset(
+        supervised_dataset,
+        torchvision.transforms.Compose(process_data.CIFAR10_STANDARD_TRANSFORMS),
+    )
     supervised_dataloader = torch.utils.data.DataLoader(
         supervised_dataset, shuffle=True, pin_memory=True
     )
@@ -527,8 +529,8 @@ def train_federated_supervised_simsiam(
         model,
         optimizer,
         rounds,
-        epochs,
-        5,
+        local_epochs,
+        supervised_epochs,
         device=DEVICE,
         learning_rate=learning_rate,
         supervised_learning_rate=supervised_learning_rate,

@@ -284,7 +284,7 @@ class FedAvgSimSiamFinetuningTrainer:
 
         self.train_loss.reset()
 
-        for _, _, image, label in self.supervised_dataloader:
+        for image, label in self.supervised_dataloader:
             image = image.to(self.device)
 
             logits = self.server_model(image)
