@@ -222,6 +222,7 @@ def train_federated(
 @click.option(
     "--val-frac", default=0.1, type=float, help="fraction of data used for validation"
 )
+@click.option("--seed", default=0, type=int)
 @click.option("--embedding-size", default=2048, type=int)
 @click.option("--backbone", default="resnet18", type=str)
 @click.option("--num-workers", default=8, type=int)
@@ -232,13 +233,14 @@ def train_simsiam(
     epochs: int,
     learning_rate: float,
     val_frac: float,
+    seed: int,
     embedding_size: int,
     backbone: str,
     num_workers: int,
     min_scale: float,
     log: bool,
 ):
-    utils.seed_everything(0)
+    utils.seed_everything(seed)
     config = {
         "batch_size": batch_size,
         "learning_rate": learning_rate,
