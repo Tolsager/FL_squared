@@ -1,4 +1,5 @@
 import copy
+from datetime import datetime
 
 import torch
 import torchmetrics
@@ -37,6 +38,8 @@ class SupervisedTrainer:
         self.train_loss = torchmetrics.MeanMetric()
         self.learning_rate = learning_rate
         self.models = [None for i in range(self.n_clients)]
+        self.best_val_acc = 0.0
+        self.timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M")
 
     @property
     def neutral_state_dict(self):
@@ -118,6 +121,11 @@ class SupervisedTrainer:
             # del label
 
         val_acc = self.val_acc.compute()
+        if val_acc > self.best_val_acc:
+            self.best_val_acc = val_acc
+            torch.save(
+                model.state_dict(), f"Federated_model_{self.timestamp}.pth"
+            )
         print(f"val_acc: {val_acc}")
         wandb.log({"val_acc": val_acc})
         model.to("cpu")
