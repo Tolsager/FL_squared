@@ -38,7 +38,6 @@ class CentralizedTrainer:
         self.val_acc = torchmetrics.Accuracy(task="multiclass", num_classes=10).to(
             self.device
         )
-        self.validation_interval = validation_interval
         self.val_acc = torchmetrics.Accuracy(task="multiclass", num_classes=10).to(self.device)
         self.best_val_acc = 0.0
         self.timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M")
@@ -87,35 +86,4 @@ class CentralizedTrainer:
                 self.val_acc.update(output.argmax(dim=1), label)
 
         return self.val_acc.compute().item()
-
-
-class SupervisedModel(nn.Module):
-    def __init__(self, backbone: str = "resnet18", num_classes: int = 10):
-        super(SupervisedModel, self).__init__()
-        self.backbone = self.get_backbone(backbone)
-        self.fc = nn.Sequential(
-            nn.Linear(512, 512),
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=0.3),
-            nn.BatchNorm1d(512),
-            nn.Linear(512, 256),
-            nn.Dropout(p=0.3),
-            nn.ReLU(inplace=True),
-            nn.BatchNorm1d(256),
-            nn.Linear(256, num_classes),
-        )
-
-    @staticmethod
-    def get_backbone(backbone_name):
-        return {
-            "resnet18": resnet.ResNet18(),
-            "resnet34": resnet.ResNet34(),
-            "resnet50": resnet.ResNet50(),
-            "resnet101": resnet.ResNet101(),
-            "resnet152": resnet.ResNet152(),
-        }[backbone_name]
-
-    def forward(self, img):
-        x = self.backbone(img)
-        x = self.fc(x)
-        return x
+    
