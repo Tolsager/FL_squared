@@ -1,5 +1,6 @@
 import math
 from typing import Optional
+from datetime import datetime
 
 import torch
 import torch.nn.functional as F
@@ -154,6 +155,8 @@ class Trainer:
         self.avg_train_loss = torchmetrics.MeanMetric()
         self.criterion = SimSiamLoss()
         self.validation_interval = validation_interval
+        self.best_val_acc = 0.0
+        self.timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M")
 
     def train_epoch(self) -> None:
         self.model.train()
@@ -194,6 +197,11 @@ class Trainer:
                 or (epoch != 0 and (epoch % self.validation_interval) == 0)
             ):
                 val_acc = self.validation()
+                if val_acc > self.best_val_acc:
+                    self.best_val_acc = val_acc
+                    torch.save(
+                        self.model.state_dict(), f"SimSiam_{self.timestamp}_model.pth"
+                    )
             wandb.log(
                 {"train_loss": avg_train_loss, "epoch": epoch, "val_acc": val_acc}
             )

@@ -1,4 +1,7 @@
-from typing import Optional
+import copy
+import random
+from datetime import datetime
+from typing import List, Tuple, Optional
 
 import resnet
 import torch
@@ -9,7 +12,7 @@ import tqdm
 import wandb
 
 
-class SupervisedTrainer:
+class CentralizedTrainer:
     def __init__(
         self,
         train_dataloader: torch.utils.data.DataLoader,
@@ -35,6 +38,10 @@ class SupervisedTrainer:
         self.val_acc = torchmetrics.Accuracy(task="multiclass", num_classes=10).to(
             self.device
         )
+        self.validation_interval = validation_interval
+        self.val_acc = torchmetrics.Accuracy(task="multiclass", num_classes=10).to(self.device)
+        self.best_val_acc = 0.0
+        self.timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M")
 
     def train_epoch(self) -> None:
         self.model.train()
@@ -60,9 +67,12 @@ class SupervisedTrainer:
             print(f"Epoch: {epoch}")
             print(f"Average train loss: {avg_train_loss}")
             val_acc = self.validation()
-            wandb.log(
-                {"train_loss": avg_train_loss, "epoch": epoch, "val_acc": val_acc}
-            )
+            if val_acc > self.best_val_acc:
+                self.best_val_acc = val_acc
+                torch.save(
+                    self.model.state_dict(), f"Centralized_{self.timestamp}_model.pth"
+                )
+            wandb.log({"train_loss": avg_train_loss, "epoch": epoch, "top1_val_acc": val_acc})
 
         wandb.finish()
 
