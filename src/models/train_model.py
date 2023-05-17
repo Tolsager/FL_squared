@@ -410,15 +410,16 @@ def train_federated_simsiam(
     optimizer = torch.optim.SGD
 
     trainer = fss.FedAvgSimSiamTrainer(
-        client_dataloaders,
-        val_dl,
-        model,
-        optimizer,
-        rounds,
-        epochs,
+        client_dataloaders=client_dataloaders,
+        val_dataloader=val_dl,
+        server_model=model,
+        optimizer=optimizer,
+        rounds=rounds,
+        epochs=epochs,
         device=DEVICE,
         learning_rate=learning_rate,
         validation_interval=validation_interval,
+        iid=iid,
     )
     wandb.init(
         project="rep-in-fed",
