@@ -211,6 +211,7 @@ def train_federated(
         criterion=criterion,
         rounds=n_rounds,
         learning_rate=learning_rate,
+        iid=iid,
     )
     trainer.train()
 

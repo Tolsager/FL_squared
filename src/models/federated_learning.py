@@ -21,6 +21,7 @@ class SupervisedTrainer:
         device: str = "cuda",
         n_classes: int = 10,
         learning_rate: float = 0.005,
+        iid: bool = False,
     ):
         self.client_dataloaders = client_dataloaders
         self.val_dataloader = val_dataloader
@@ -37,6 +38,7 @@ class SupervisedTrainer:
         ).to(device)
         self.train_loss = torchmetrics.MeanMetric()
         self.learning_rate = learning_rate
+        self.iid = iid
         self.models = [None for i in range(self.n_clients)]
         self.best_val_acc = 0.0
         self.timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M")
@@ -124,7 +126,7 @@ class SupervisedTrainer:
         if val_acc > self.best_val_acc:
             self.best_val_acc = val_acc
             torch.save(
-                model.state_dict(), f"Federated_model_{self.timestamp}.pth"
+                model.state_dict(), f"{'iid_' if self.iid else ''}Federated_model_{self.timestamp}.pth"
             )
         print(f"val_acc: {val_acc}")
         wandb.log({"val_acc": val_acc})
