@@ -466,41 +466,36 @@ def train_federated_supervised_simsiam(
 
     val_dl = None
     if val_frac > 0:
-        train_ds, val_ds = process_data.stratified_train_val_split(
-            train_ds, label_fn=process_data.cifar10_sort_fn, val_size=val_frac
-        )
-        val_ds = process_data.AugmentedDataset(
-            val_ds,
-            torchvision.transforms.Compose(process_data.CIFAR10_STANDARD_TRANSFORMS),
-        )
-        val_dl = torch.utils.data.DataLoader(
-            val_ds, batch_size=batch_size, num_workers=num_workers, pin_memory=True
+        # supervised frac and val frac are assumed to be the same
+        train_ds, val_and_supervised_ds = process_data.stratified_train_val_split(
+            train_ds, label_fn=process_data.cifar10_sort_fn, val_size=val_frac * 2
         )
 
-    # sort train_ds
-    train_ds = process_data.sort_dataset(train_ds, process_data.simsiam_sort_fn)
+        val_and_supervised_ds = process_data.AugmentedDataset(
+            val_and_supervised_ds,
+            torchvision.transforms.Compose(process_data.CIFAR10_STANDARD_TRANSFORMS),
+        )
+
+        # sort the dataset for validation and supervised training and split it in 2
+        val_and_supervised_ds = process_data.sort_dataset(
+            val_and_supervised_ds, process_data.cifar10_sort_fn
+        )
+        val_ds, supervised_ds = process_data.stratified_train_val_split(
+            val_and_supervised_ds, process_data.cifar10_sort_fn, 0.5
+        )
+        val_dl = torch.utils.data.DataLoader(val_ds, pin_memory=True)
 
     # split the data to the clients
     if iid:
         train_datasets = process_data.simple_datasplit(train_ds, n_clients)
-        supervised_dataset = process_data.get_stratified_subset(
-            train_ds, process_data.cifar10_sort_fn, 0.1
-        )
     else:
         datasplitter = process_data.DataSplitter(
             train_ds, n_clients, shards_per_client=2
         )
         train_datasets = datasplitter.split_data()
-        supervised_dataset = torch.utils.data.ConcatDataset(
-            [process_data.get_random_subset(ds, 0.1) for ds in train_datasets]
-        )
 
-    supervised_dataset = process_data.AugmentedDataset(
-        supervised_dataset,
-        torchvision.transforms.Compose(process_data.CIFAR10_STANDARD_TRANSFORMS),
-    )
-    supervised_dataloader = torch.utils.data.DataLoader(
-        supervised_dataset, shuffle=True, pin_memory=True
+    supervised_dl = torch.utils.data.DataLoader(
+        supervised_ds, shuffle=True, pin_memory=True
     )
 
     train_datasets = [
@@ -524,7 +519,7 @@ def train_federated_supervised_simsiam(
 
     trainer = fss.FedAvgSimSiamFinetuningTrainer(
         client_dataloaders,
-        supervised_dataloader,
+        supervised_dl,
         val_dl,
         model,
         optimizer,
