@@ -1,0 +1,4 @@
+Centralized: 0.9265000224113464
+Federated: 0.6826000213623047
+Federated non-i.i.d.: 0.4000999927520752
+SimSiam: 0.816
