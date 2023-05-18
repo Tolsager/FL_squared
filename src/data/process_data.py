@@ -318,3 +318,33 @@ def simple_datasplit(
 
 def simsiam_sort_fn(batch: Tuple[torch.Tensor]) -> torch.tensor:
     return batch[-1]
+
+
+def get_stratified_subset(
+    ds: torch.utils.data.Dataset, label_fn: Callable, frac: float
+):
+    ds = sort_dataset(ds, label_fn)
+    labels_start_indices = []
+
+    last_label = None
+
+    for i, sample in enumerate(ds):
+        label = label_fn(sample)
+        if label != last_label:
+            labels_start_indices.append(i)
+            last_label = label
+
+    n_samples = int(frac * len(ds))
+    subset_indices = []
+    while len(subset_indices) < n_samples:
+        for i in range(len(labels_start_indices)):
+            subset_indices.append(labels_start_indices[i])
+            labels_start_indices[i] += 1
+
+    return torch.utils.data.Subset(ds, subset_indices)
+
+
+def get_random_subset(ds: torch.utils.data.Dataset, frac: float):
+    n_samples = int(len(ds) * frac)
+    indices = np.random.choice(len(ds), n_samples, replace=False)
+    return torch.utils.data.Subset(ds, indices)

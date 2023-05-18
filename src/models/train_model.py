@@ -306,7 +306,7 @@ def train_simsiam(
 
 
 @click.command(name="FL2")
-@click.option("--batch_size", default=512, type=int)
+@click.option("--batch-size", default=512, type=int)
 @click.option("--epochs", default=5, type=int)
 @click.option("--learning-rate", default=0.06, type=float)
 @click.option("--embedding-size", default=2048, type=int)
@@ -428,6 +428,135 @@ def train_federated_simsiam(
     trainer.train()
 
 
+@click.command(name="FLS")
+@click.option("--batch-size", default=512, type=int)
+@click.option("--local-epochs", default=4, type=int)
+@click.option("--supervised-epochs", default=5, type=int)
+@click.option("--learning-rate", default=0.06, type=float)
+@click.option("--supervised-learning-rate", default=0.06, type=float)
+@click.option("--embedding-size", default=2048, type=int)
+@click.option("--backbone", default="resnet18", type=str)
+@click.option("--num-workers", default=8, type=int)
+@click.option("--log", is_flag=True, default=False)
+@click.option(
+    "--iid", is_flag=True, default=False, help="if the data is iid or non-iid"
+)
+@click.option(
+    "--val-frac", default=0.1, type=float, help="fraction of data used for validation"
+)
+@click.option("--seed", default=0, type=int)
+@click.option("--n-clients", default=10, type=int)
+@click.option(
+    "--rounds", default=5, type=int, help="Number of training rounds clients to perform"
+)
+def train_federated_supervised_simsiam(
+    batch_size: int,
+    local_epochs: int,
+    supervised_epochs: int,
+    learning_rate: float,
+    supervised_learning_rate: float,
+    embedding_size: int,
+    backbone: str,
+    num_workers: int,
+    log: bool,
+    iid: bool,
+    val_frac: float,
+    seed: int,
+    n_clients: int,
+    rounds: int,
+):
+    utils.seed_everything(seed)
+    config = {
+        "batch_size": batch_size,
+        "learning_rate": learning_rate,
+    }
+    tags = ["debug"]
+    notes = "find optimal learning rate"
+    architectures = {"resnet18", "resnet34", "resnet50", "resnet101", "resnet152"}
+    if not (backbone in architectures):
+        raise ValueError(
+            f"Architecture {backbone} is not supported must be in {architectures}"
+        )
+
+    train_ds, test_ds = make_dataset.load_dataset(dataset="cifar10")
+
+    val_dl = None
+    if val_frac > 0:
+        # supervised frac and val frac are assumed to be the same
+        train_ds, val_and_supervised_ds = process_data.stratified_train_val_split(
+            train_ds, label_fn=process_data.cifar10_sort_fn, val_size=val_frac * 2
+        )
+
+        val_and_supervised_ds = process_data.AugmentedDataset(
+            val_and_supervised_ds,
+            torchvision.transforms.Compose(process_data.CIFAR10_STANDARD_TRANSFORMS),
+        )
+
+        # sort the dataset for validation and supervised training and split it in 2
+        val_and_supervised_ds = process_data.sort_dataset(
+            val_and_supervised_ds, process_data.cifar10_sort_fn
+        )
+        val_ds, supervised_ds = process_data.stratified_train_val_split(
+            val_and_supervised_ds, process_data.cifar10_sort_fn, 0.5
+        )
+        val_dl = torch.utils.data.DataLoader(val_ds, pin_memory=True)
+
+    # split the data to the clients
+    if iid:
+        train_datasets = process_data.simple_datasplit(train_ds, n_clients)
+    else:
+        datasplitter = process_data.DataSplitter(
+            train_ds, n_clients, shards_per_client=2
+        )
+        train_datasets = datasplitter.split_data()
+
+    supervised_dl = torch.utils.data.DataLoader(
+        supervised_ds, shuffle=True, pin_memory=True
+    )
+
+    train_datasets = [
+        process_data.SimSiamDataset(ds, process_data.get_cifar10_transforms())
+        for ds in train_datasets
+    ]
+
+    client_dataloaders = [
+        torch.utils.data.DataLoader(
+            ds,
+            batch_size=batch_size,
+            num_workers=num_workers,
+            pin_memory=True,
+            shuffle=True,
+        )
+        for ds in train_datasets
+    ]
+
+    model = simsiam.SimSiam(embedding_size=embedding_size)
+    optimizer = torch.optim.SGD
+
+    trainer = fss.FedAvgSimSiamFinetuningTrainer(
+        client_dataloaders,
+        supervised_dl,
+        val_dl,
+        model,
+        optimizer,
+        rounds,
+        local_epochs,
+        supervised_epochs,
+        device=DEVICE,
+        learning_rate=learning_rate,
+        supervised_learning_rate=supervised_learning_rate,
+    )
+    wandb.init(
+        project="rep-in-fed",
+        entity="pydqn",
+        mode="online" if log else "disabled",
+        config=config,
+        notes=notes,
+        tags=tags,
+    )
+    trainer.train()
+
+
 @click.group()
 def cli():
     pass
@@ -437,6 +566,7 @@ cli.add_command(train_supervised)
 cli.add_command(train_simsiam)
 cli.add_command(train_federated_simsiam)
 cli.add_command(train_federated)
+cli.add_command(train_federated_supervised_simsiam)
 
 if __name__ == "__main__":
     cli()

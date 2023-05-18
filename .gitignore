@@ -2,6 +2,7 @@
 lightning_logs
 wandb
 rep-in-fed
+/models/
 
 
 # Byte-compiled / optimized / DLL files
