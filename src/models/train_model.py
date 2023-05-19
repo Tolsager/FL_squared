@@ -557,6 +557,88 @@ def train_federated_supervised_simsiam(
     trainer.train()
 
 
+@click.command(name="finetune")
+@click.option("--batch-size", default=512, type=int)
+@click.option("--num-workers", default=8, type=int)
+@click.option("--seed", default=0, type=int)
+@click.option("--epochs", default=100, type=int)
+@click.option("--learning-rate", default=0.1, type=float)
+@click.option("--val-frac", default=0.1, type=float)
+@click.option("--embedding-size", default=2048, type=int)
+@click.option("--model-weights", default=None, type=str)
+@click.option("--log", is_flag=True, default=False)
+def finetune_federated(
+    batch_size: int,
+    num_workers: int,
+    seed: int,
+    epochs: int,
+    learning_rate: float,
+    val_frac: float,
+    embedding_size: int,
+    model_weights: str,
+    log: bool,
+):
+    assert val_frac > 0, "Validation fraction must be greater than 0 to finetune"
+
+    utils.seed_everything(seed)
+
+    train_ds, test_ds = make_dataset.load_dataset(dataset="cifar10")
+
+    _, split_ds = process_data.stratified_train_val_split(
+        train_ds, label_fn=process_data.cifar10_sort_fn, val_size=val_frac
+    )
+
+    split_ds = process_data.AugmentedDataset(
+        split_ds, torchvision.transforms.Compose(process_data.CIFAR10_STANDARD_TRANSFORMS)
+    )
+
+    split_ds = process_data.sort_dataset(split_ds, process_data.cifar10_sort_fn)
+
+    finetune_ds, val_ds = process_data.stratified_train_val_split(split_ds, label_fn=process_data.cifar10_sort_fn, val_size=0.5
+    )
+
+    finetune_dl = torch.utils.data.DataLoader(
+        finetune_ds, batch_size=batch_size, num_workers=num_workers, pin_memory=True, shuffle=True
+    )
+
+    val_dl = torch.utils.data.DataLoader(
+        val_ds, batch_size=batch_size, num_workers=num_workers, pin_memory=True, shuffle=True
+    )
+
+    simsiam_model = simsiam.SimSiam(embedding_size=embedding_size)
+
+    if model_weights is not None:
+        weights = torch.load(model_weights, map_location=DEVICE)
+        if "clf.weight" in weights and "clf.bias" in weights:
+            simsiam_model.load_state_dict(weights)
+        else:
+            simsiam_model.clf = None
+            simsiam_model.load_state_dict(weights)
+
+        for param in simsiam_model.parameters():
+            param.requires_grad = False
+        simsiam_model.clf = torch.nn.Linear(512, 10)
+        simsiam_model.to(DEVICE)
+
+
+    wandb.init(
+        project="rep-in-fed",
+        entity="pydqn",
+        mode="online" if log else "disabled",
+    )
+
+    trainer = model.SupervisedTrainer(
+        train_dataloader=finetune_dl,
+        val_dataloader=val_dl,
+        model=simsiam_model,
+        epochs=epochs,
+        learning_rate=learning_rate,
+        device=DEVICE,
+    )
+
+    trainer.train()
+
+
 @click.group()
 def cli():
     pass
@@ -567,6 +649,7 @@ cli.add_command(train_simsiam)
 cli.add_command(train_federated_simsiam)
 cli.add_command(train_federated)
 cli.add_command(train_federated_supervised_simsiam)
+cli.add_command(finetune_federated)
 
 if __name__ == "__main__":
     cli()

@@ -35,6 +35,7 @@ class SupervisedTrainer:
         self.val_acc = torchmetrics.Accuracy(task="multiclass", num_classes=10).to(
             self.device
         )
+        # self.tune = True
 
     def train_epoch(self) -> None:
         self.model.train()
@@ -60,6 +61,14 @@ class SupervisedTrainer:
             print(f"Epoch: {epoch}")
             print(f"Average train loss: {avg_train_loss}")
             val_acc = self.validation()
+            # print(f"Validation accuracy: {val_acc}")
+            # if val_acc > 0.4 and self.tune:
+            #     print("Unfreezing layers")
+            #     for param in self.model.parameters():
+            #         param.requires_grad = True
+            #
+            #     self.tune = False
+
             wandb.log(
                 {"train_loss": avg_train_loss, "epoch": epoch, "val_acc": val_acc}
             )
