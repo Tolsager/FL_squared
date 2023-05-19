@@ -189,8 +189,6 @@ def train_federated(
     optimizer = torch.optim.SGD
     criterion = torch.nn.CrossEntropyLoss()
 
-    # put models on device
-
     print(f"Training on: {DEVICE}")
 
     wandb.init(
@@ -353,8 +351,8 @@ def train_federated_simsiam(
         "batch_size": batch_size,
         "learning_rate": learning_rate,
     }
-    tags = ["debug"]
-    notes = "find optimal learning rate"
+    tags = ["FL2"]
+    notes = "train with 80% of the data"
     architectures = {"resnet18", "resnet34", "resnet50", "resnet101", "resnet152"}
     if not (backbone in architectures):
         raise ValueError(
@@ -365,16 +363,29 @@ def train_federated_simsiam(
 
     val_dl = None
     if val_frac > 0:
-        train_ds, val_ds = process_data.stratified_train_val_split(
-            train_ds, label_fn=process_data.cifar10_sort_fn, val_size=val_frac
+        # supervised frac and val frac are assumed to be the same
+        train_ds, val_and_supervised_ds = process_data.stratified_train_val_split(
+            train_ds, label_fn=process_data.cifar10_sort_fn, val_size=val_frac * 2
         )
-        val_ds = process_data.AugmentedDataset(
-            val_ds,
+
+        val_and_supervised_ds = process_data.AugmentedDataset(
+            val_and_supervised_ds,
             torchvision.transforms.Compose(process_data.CIFAR10_STANDARD_TRANSFORMS),
         )
-        val_dl = torch.utils.data.DataLoader(
-            val_ds, batch_size=batch_size, num_workers=num_workers, pin_memory=True
+
+        val_ds, supervised_ds = process_data.stratified_train_val_split(
+            val_and_supervised_ds, process_data.cifar10_sort_fn, 0.5
         )
+        val_dl = torch.utils.data.DataLoader(val_ds, pin_memory=True)
+
+    # split the data to the clients
+    if iid:
+        train_datasets = process_data.simple_datasplit(train_ds, n_clients)
+    else:
+        datasplitter = process_data.DataSplitter(
+            train_ds, n_clients, shards_per_client=2
+        )
+        train_datasets = datasplitter.split_data()
 
     train_ds = process_data.SimSiamDataset(
         train_ds, process_data.get_cifar10_transforms()

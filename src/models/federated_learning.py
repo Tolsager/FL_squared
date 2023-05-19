@@ -105,17 +105,18 @@ class SupervisedTrainer:
         model.to(self.device)
         model.eval()
         self.val_acc.reset()
-        for image, label in self.val_dataloader:
-            image = image.to(self.device)
+        with torch.no_grad():
+            for image, label in self.val_dataloader:
+                image = image.to(self.device)
 
-            logits = model(image)
-            # del image
-            out = torch.argmax(logits, dim=1)
+                logits = model(image)
+                # del image
+                out = torch.argmax(logits, dim=1)
 
-            label = label.to(self.device)
-            self.val_acc(out, label)
-            # del out
-            # del label
+                label = label.to(self.device)
+                self.val_acc(out, label)
+                # del out
+                # del label
 
         val_acc = self.val_acc.compute()
         print(f"val_acc: {val_acc}")
