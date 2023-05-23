@@ -1,4 +1,5 @@
 import copy
+from datetime import datetime
 
 import torch
 import torchmetrics
@@ -20,6 +21,7 @@ class SupervisedTrainer:
         device: str = "cuda",
         n_classes: int = 10,
         learning_rate: float = 0.005,
+        iid: bool = False,
     ):
         self.client_dataloaders = client_dataloaders
         self.val_dataloader = val_dataloader
@@ -36,7 +38,10 @@ class SupervisedTrainer:
         ).to(device)
         self.train_loss = torchmetrics.MeanMetric()
         self.learning_rate = learning_rate
+        self.iid = iid
         self.models = [None for i in range(self.n_clients)]
+        self.best_val_acc = 0.0
+        self.timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M")
 
     @property
     def neutral_state_dict(self):
@@ -105,19 +110,25 @@ class SupervisedTrainer:
         model.to(self.device)
         model.eval()
         self.val_acc.reset()
-        for image, label in self.val_dataloader:
-            image = image.to(self.device)
+        with torch.no_grad():
+            for image, label in self.val_dataloader:
+                image = image.to(self.device)
 
-            logits = model(image)
-            # del image
-            out = torch.argmax(logits, dim=1)
+                logits = model(image)
+                # del image
+                out = torch.argmax(logits, dim=1)
 
-            label = label.to(self.device)
-            self.val_acc(out, label)
-            # del out
-            # del label
+                label = label.to(self.device)
+                self.val_acc(out, label)
+                # del out
+                # del label
 
         val_acc = self.val_acc.compute()
+        if val_acc > self.best_val_acc:
+            self.best_val_acc = val_acc
+            torch.save(
+                model.state_dict(), f"{'iid_' if self.iid else ''}Federated_model_{self.timestamp}.pth"
+            )
         print(f"val_acc: {val_acc}")
         wandb.log({"val_acc": val_acc})
         model.to("cpu")
