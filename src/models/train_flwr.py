@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from typing import *
 
 import click
@@ -112,6 +113,9 @@ def supervised(
         train_dl = client_dataloaders[int(cid)]
         return fed_flwr.CifarClient(net, train_dl, local_epochs, lr, DEVICE)
 
+    timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M")
+    best_val_acc = 0
+
     def evaluate(
         server_round: int,
         parameters: fl.common.NDArrays,
@@ -126,6 +130,13 @@ def supervised(
         wandb.log({"val_loss": loss, "val_acc": metrics["accuracy"]})
 
         print(f"Server loss: {loss}, server accuracy: {metrics['accuracy']}")
+
+        if metrics["accuracy"] > best_val_acc:
+            best_val_acc = metrics["accuracy"]
+            torch.save(
+                model.state_dict(),
+                f"models/fedavg_{'iid_' if iid else 'non_iid_'}{timestamp}.pth",
+            )
 
         return loss, metrics
 
