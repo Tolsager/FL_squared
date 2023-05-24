@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 import resnet
@@ -19,6 +20,7 @@ class SupervisedTrainer:
         learning_rate: float = 0.001,
         weight_decay: float = 0,
         device: str = "cuda",
+        unfreeze: bool = False,
     ):
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
@@ -35,7 +37,9 @@ class SupervisedTrainer:
         self.val_acc = torchmetrics.Accuracy(task="multiclass", num_classes=10).to(
             self.device
         )
-        # self.tune = True
+
+        self.timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M")
+        self.best_val_acc = 0.0
 
     def train_epoch(self) -> None:
         self.model.train()
@@ -61,13 +65,12 @@ class SupervisedTrainer:
             print(f"Epoch: {epoch}")
             print(f"Average train loss: {avg_train_loss}")
             val_acc = self.validation()
-            # print(f"Validation accuracy: {val_acc}")
-            # if val_acc > 0.4 and self.tune:
-            #     print("Unfreezing layers")
-            #     for param in self.model.parameters():
-            #         param.requires_grad = True
-            #
-            #     self.tune = False
+            print(f"Validation accuracy: {val_acc}")
+
+            if val_acc > self.best_val_acc:
+                self.best_val_acc = val_acc
+                torch.save(
+                    self.model.state_dict(), f"models/Supervised_model_{self.timestamp}.pth")
 
             wandb.log(
                 {"train_loss": avg_train_loss, "epoch": epoch, "val_acc": val_acc}
@@ -86,6 +89,63 @@ class SupervisedTrainer:
                 self.val_acc.update(output.argmax(dim=1), label)
 
         return self.val_acc.compute().item()
+
+
+class SupervisedFinetuner(SupervisedTrainer):
+    def __init__(
+        self,
+        train_dataloader: torch.utils.data.DataLoader,
+        val_dataloader: Optional[torch.utils.data.DataLoader],
+        model: torch.nn.Module,
+        epochs: int = 10,
+        learning_rate: float = 0.001,
+        weight_decay: float = 0,
+        device: str = "cuda",
+        unfreeze: bool = False,
+        iid: bool = False,
+        model_weights: str = None,
+    ):
+        super().__init__(
+            train_dataloader,
+            val_dataloader,
+            model,
+            epochs,
+            learning_rate,
+            weight_decay,
+            device,
+        )
+        self.unfreeze = unfreeze
+        self.model_weights = model_weights
+        self.iid = iid
+
+    def train(self) -> None:
+        for epoch in tqdm.trange(self.epochs):
+            self.avg_train_loss.reset()
+            self.train_epoch()
+            avg_train_loss = self.avg_train_loss.compute()
+            print(f"Epoch: {epoch}")
+            print(f"Average train loss: {avg_train_loss}")
+            val_acc = self.validation()
+            print(f"Validation accuracy: {val_acc}")
+
+            if epoch == 500 and self.unfreeze:
+                for param in self.model.parameters():
+                    param.requires_grad = True
+
+                self.unfreeze = False
+
+            if val_acc > self.best_val_acc:
+                self.best_val_acc = val_acc
+                torch.save(
+                    self.model.state_dict(), f"models/{'iid_' if self.iid else 'non_iid_'}Finetuned_FLS_{self.timestamp}.pth")
+
+            wandb.log(
+                {"train_loss": avg_train_loss, "epoch": epoch, "val_acc": val_acc}
+            )
+
+        wandb.finish()
+
+
 
 
 class SupervisedModel(nn.Module):

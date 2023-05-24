@@ -566,7 +566,9 @@ def train_federated_supervised_simsiam(
 @click.option("--val-frac", default=0.1, type=float)
 @click.option("--embedding-size", default=2048, type=int)
 @click.option("--model-weights", default=None, type=str)
+@click.option("--iid", is_flag=True, default=False, help="Whether the model has been trained on iid data or not")
 @click.option("--log", is_flag=True, default=False)
+@click.option("--unfreeze", is_flag=True, default=False)
 def finetune_federated(
     batch_size: int,
     num_workers: int,
@@ -577,6 +579,8 @@ def finetune_federated(
     embedding_size: int,
     model_weights: str,
     log: bool,
+    unfreeze: bool,
+    iid: bool
 ):
     assert val_frac > 0, "Validation fraction must be greater than 0 to finetune"
 
@@ -627,13 +631,16 @@ def finetune_federated(
         mode="online" if log else "disabled",
     )
 
-    trainer = model.SupervisedTrainer(
+    trainer = model.SupervisedFinetuner(
         train_dataloader=finetune_dl,
         val_dataloader=val_dl,
         model=simsiam_model,
         epochs=epochs,
         learning_rate=learning_rate,
         device=DEVICE,
+        unfreeze=unfreeze,
+        iid=iid,
+        model_weights=model_weights,
     )
 
     trainer.train()

@@ -18,7 +18,7 @@ class EvalModel:
     def prepare_model(self) -> None:
         weights_path = os.path.join("models", self.model_weights)
         self.model.cuda()
-        self.model.load_state_dict(torch.load(weights_path), strict=False)
+        self.model.load_state_dict(torch.load(weights_path), strict=True)
         self.model.eval()
 
     def get_dl(self) -> torch.utils.data.DataLoader:
@@ -116,22 +116,53 @@ def write_results(exp_name: str, acc: float):
 
 
 if __name__ == "__main__":
-    model = resnet.ResNet18Classifier(10)
-    evaluator = EvalSupervised("Centralized.pth", model)
-    acc = evaluator.eval()
-    write_results("Centralized", acc)
-
-    model = resnet.ResNet18Classifier(10)
-    evaluator = EvalSupervised("Federated.pth", model)
-    acc = evaluator.eval()
-    write_results("Federated", acc)
-
-    model = resnet.ResNet18Classifier(10)
-    evaluator = EvalSupervised("Federated_non-iid.pth", model)
-    acc = evaluator.eval()
-    write_results("Federated non-i.i.d.", acc)
+    # model = resnet.ResNet18Classifier(10)
+    # evaluator = EvalSupervised("Centralized.pth", model)
+    # acc = evaluator.eval()
+    # write_results("Centralized", acc)
+    #
+    # model = resnet.ResNet18Classifier(10)
+    # evaluator = EvalSupervised("Federated.pth", model)
+    # acc = evaluator.eval()
+    # write_results("Federated", acc)
+    #
+    # model = resnet.ResNet18Classifier(10)
+    # evaluator = EvalSupervised("Federated_non-iid.pth", model)
+    # acc = evaluator.eval()
+    # write_results("Federated non-i.i.d.", acc)
+    #
+    # model = simsiam.SimSiam()
+    # evaluator = EvalSimSiam("SimSiam.pth", model)
+    # acc = evaluator.eval()
+    # write_results("SimSiam", acc)
 
     model = simsiam.SimSiam()
-    evaluator = EvalSimSiam("SimSiam.pth", model)
+    evaluator = EvalSimSiam("FLS.pth", model)
     acc = evaluator.eval()
-    write_results("SimSiam", acc)
+    write_results("FLS", acc)
+
+    model = simsiam.SimSiam()
+    evaluator = EvalSimSiam("FLS_non-iid.pth", model)
+    acc = evaluator.eval()
+    write_results("FLS non-i.i.d.", acc)
+
+
+    model = simsiam.SimSiam(n_classes=10)
+    evaluator = EvalSupervised("iid_Finetuned_FLS_2023_05_23_14_13.pth", model)
+    acc = evaluator.eval()
+    write_results("iid_Finetuned_FLS_2023_05_23_14_13", acc)
+
+    model = simsiam.SimSiam(n_classes=10)
+    evaluator = EvalSupervised("unfrozen_iid_Finetuned_FLS_2023_05_23_14_50.pth", model)
+    acc = evaluator.eval()
+    write_results("unfrozen_iid_Finetuned_FLS_2023_05_23_14_50", acc)
+
+    model = simsiam.SimSiam(n_classes=10)
+    evaluator = EvalSupervised("non_iid_Finetuned_FLS_2023_05_23_14_52.pth", model)
+    acc = evaluator.eval()
+    write_results("non_iid_Finetuned_FLS_2023_05_23_14_52", acc)
+
+    model = simsiam.SimSiam(n_classes=10)
+    evaluator = EvalSupervised("unfrozen_non_iid_Finetuned_FLS_2023_05_23_15_23.pth", model)
+    acc = evaluator.eval()
+    write_results("unfrozen_non_iid_Finetuned_FLS_2023_05_23_15_23", acc)
