@@ -1,9 +1,10 @@
-from typing import *
-import flwr as fl
-import torchmetrics
-import numpy as np
 from collections import OrderedDict
+from typing import *
+
+import flwr as fl
+import numpy as np
 import torch
+import torchmetrics
 
 
 def train(

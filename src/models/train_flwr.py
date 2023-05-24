@@ -1,5 +1,8 @@
-import click
+import os
 from typing import *
+
+import click
+import flwr as fl
 import torch
 import torchvision
 from dotenv import find_dotenv, load_dotenv
@@ -7,11 +10,9 @@ from dotenv import find_dotenv, load_dotenv
 import wandb
 from src import utils
 from src.data import make_dataset, process_data
-from src.models import federated_simsiam as fss
-import flwr as fl
-from src.models import model, resnet, simsiam
 from src.models import fed_flwr
-import os
+from src.models import federated_simsiam as fss
+from src.models import model, resnet, simsiam
 
 # os.environ["RAY_memory_monitor_refresh_ms"] = "0"
 
