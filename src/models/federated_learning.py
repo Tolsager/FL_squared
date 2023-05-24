@@ -127,7 +127,8 @@ class SupervisedTrainer:
         if val_acc > self.best_val_acc:
             self.best_val_acc = val_acc
             torch.save(
-                model.state_dict(), f"{'iid_' if self.iid else ''}Federated_model_{self.timestamp}.pth"
+                model.state_dict(),
+                f"{'iid_' if self.iid else ''}Federated_model_{self.timestamp}.pth",
             )
         print(f"val_acc: {val_acc}")
         wandb.log({"val_acc": val_acc})

@@ -121,6 +121,7 @@ def supervised(
         parameters: fl.common.NDArrays,
         config: Dict[str, fl.common.Scalar],
     ) -> Optional[Tuple[float, Dict[str, fl.common.Scalar]]]:
+        global best_val_acc
         net = resnet.ResNet18Classifier(10)
         net.to(DEVICE)
         fed_flwr.set_parameters(
