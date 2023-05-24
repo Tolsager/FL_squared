@@ -114,14 +114,14 @@ def supervised(
         return fed_flwr.CifarClient(net, train_dl, local_epochs, lr, DEVICE)
 
     timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M")
-    best_val_acc = 0
+    with open("val_scores.txt", "w") as f:
+        f.write("0")
 
     def evaluate(
         server_round: int,
         parameters: fl.common.NDArrays,
         config: Dict[str, fl.common.Scalar],
     ) -> Optional[Tuple[float, Dict[str, fl.common.Scalar]]]:
-        global best_val_acc
         net = resnet.ResNet18Classifier(10)
         net.to(DEVICE)
         fed_flwr.set_parameters(
@@ -132,10 +132,14 @@ def supervised(
 
         print(f"Server loss: {loss}, server accuracy: {metrics['accuracy']}")
 
+        with open("val_scores.txt", "r") as f:
+            best_val_acc = int(f.read())
+
         if metrics["accuracy"] > best_val_acc:
-            best_val_acc = metrics["accuracy"]
+            with open("val_scores.txt", "w") as f:
+                f.write(f"{best_val_acc}")
             torch.save(
-                model.state_dict(),
+                net.state_dict(),
                 f"models/fedavg_{'iid_' if iid else 'non_iid_'}{timestamp}.pth",
             )
 
