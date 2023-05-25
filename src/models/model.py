@@ -14,15 +14,15 @@ import wandb
 
 class CentralizedTrainer:
     def __init__(
-        self,
-        train_dataloader: torch.utils.data.DataLoader,
-        val_dataloader: Optional[torch.utils.data.DataLoader],
-        model: torch.nn.Module,
-        epochs: int = 10,
-        learning_rate: float = 0.001,
-        weight_decay: float = 0,
-        device: str = "cuda",
-        unfreeze: bool = False,
+            self,
+            train_dataloader: torch.utils.data.DataLoader,
+            val_dataloader: Optional[torch.utils.data.DataLoader],
+            model: torch.nn.Module,
+            epochs: int = 10,
+            learning_rate: float = 0.001,
+            weight_decay: float = 0,
+            device: str = "cuda",
+            unfreeze: bool = False,
     ):
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
@@ -82,7 +82,6 @@ class CentralizedTrainer:
                 {"train_loss": avg_train_loss, "epoch": epoch, "val_acc": val_acc}
             )
 
-
         wandb.finish()
 
     def validation(self) -> float:
@@ -97,19 +96,20 @@ class CentralizedTrainer:
 
         return self.val_acc.compute().item()
 
-class SupervisedFinetuner(SupervisedTrainer):
+
+class SupervisedFinetuner(CentralizedTrainer):
     def __init__(
-        self,
-        train_dataloader: torch.utils.data.DataLoader,
-        val_dataloader: Optional[torch.utils.data.DataLoader],
-        model: torch.nn.Module,
-        epochs: int = 10,
-        learning_rate: float = 0.001,
-        weight_decay: float = 0,
-        device: str = "cuda",
-        unfreeze: bool = False,
-        iid: bool = False,
-        model_weights: str = None,
+            self,
+            train_dataloader: torch.utils.data.DataLoader,
+            val_dataloader: Optional[torch.utils.data.DataLoader],
+            model: torch.nn.Module,
+            epochs: int = 10,
+            learning_rate: float = 0.001,
+            weight_decay: float = 0,
+            device: str = "cuda",
+            unfreeze: bool = False,
+            iid: bool = False,
+            model_weights: str = None,
     ):
         super().__init__(
             train_dataloader,
@@ -143,15 +143,14 @@ class SupervisedFinetuner(SupervisedTrainer):
             if val_acc > self.best_val_acc:
                 self.best_val_acc = val_acc
                 torch.save(
-                    self.model.state_dict(), f"models/{'iid_' if self.iid else 'non_iid_'}Finetuned_FLS_{self.timestamp}.pth")
+                    self.model.state_dict(),
+                    f"models/{'iid_' if self.iid else 'non_iid_'}Finetuned_FLS_{self.timestamp}.pth")
 
             wandb.log(
                 {"train_loss": avg_train_loss, "epoch": epoch, "val_acc": val_acc}
             )
 
         wandb.finish()
-
-
 
 
 class SupervisedModel(nn.Module):
@@ -184,4 +183,3 @@ class SupervisedModel(nn.Module):
         x = self.backbone(img)
         x = self.fc(x)
         return x
-

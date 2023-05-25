@@ -462,7 +462,7 @@ def train_federated_simsiam(
 @click.option("--seed", default=0, type=int)
 @click.option("--n-clients", default=10, type=int)
 @click.option(
-    "--rounds", default=5, type=int, help="Number of training rounds clients to perform"
+    "--n-rounds", default=5, type=int, help="Number of training rounds clients to perform"
 )
 def train_federated_supervised_simsiam(
     batch_size: int,
@@ -478,7 +478,7 @@ def train_federated_supervised_simsiam(
     val_frac: float,
     seed: int,
     n_clients: int,
-    rounds: int,
+    n_rounds: int,
 ):
     utils.seed_everything(seed)
     config = {
@@ -554,9 +554,9 @@ def train_federated_supervised_simsiam(
         val_dl,
         model,
         optimizer,
-        rounds,
-        local_epochs,
-        supervised_epochs,
+        rounds=n_rounds,
+        local_epochs=local_epochs,
+        finetuning_epochs=supervised_epochs,
         device=DEVICE,
         learning_rate=learning_rate,
         supervised_learning_rate=supervised_learning_rate,
@@ -613,7 +613,8 @@ def finetune_federated(
 
     split_ds = process_data.sort_dataset(split_ds, process_data.cifar10_sort_fn)
 
-    finetune_ds, val_ds = process_data.stratified_train_val_split(split_ds, label_fn=process_data.cifar10_sort_fn, val_size=0.5
+    finetune_ds, val_ds = process_data.stratified_train_val_split(
+        split_ds, label_fn=process_data.cifar10_sort_fn, val_size=0.5
     )
 
     finetune_dl = torch.utils.data.DataLoader(
