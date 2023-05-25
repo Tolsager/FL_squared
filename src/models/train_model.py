@@ -323,7 +323,7 @@ def train_simsiam(
 @click.option("--seed", default=0, type=int)
 @click.option("--n-clients", default=10, type=int)
 @click.option(
-    "--rounds", default=5, type=int, help="Number of training rounds clients to perform"
+    "--n-rounds", default=5, type=int, help="Number of training rounds clients to perform"
 )
 @click.option("--validation-interval", default=1, type=int)
 @click.option("--sweep", is_flag=True, default=False)
@@ -340,7 +340,7 @@ def train_federated_simsiam(
     val_frac: float,
     seed: int,
     n_clients: int,
-    rounds: int,
+    n_rounds: int,
     validation_interval: int,
     sweep: bool,
     total_epochs: int,
@@ -348,7 +348,7 @@ def train_federated_simsiam(
     if sweep:
         epoch_map = {1: 4, 2: 5, 3: 8, 4: 10, 5: 20}
         epochs = epoch_map[epochs]
-        rounds = total_epochs // epochs
+        n_rounds = total_epochs // epochs
     utils.seed_everything(seed)
     config = {
         "batch_size": batch_size,
@@ -425,7 +425,7 @@ def train_federated_simsiam(
         val_dataloader=val_dl,
         server_model=model,
         optimizer=optimizer,
-        rounds=rounds,
+        rounds=n_rounds,
         epochs=epochs,
         device=DEVICE,
         learning_rate=learning_rate,
