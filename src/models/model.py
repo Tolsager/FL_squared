@@ -71,7 +71,7 @@ class CentralizedTrainer:
                 torch.save(
                     self.model.state_dict(), f"Centralized_{self.timestamp}_model.pth"
                 )
-            wandb.log({"train_loss": avg_train_loss, "epoch": epoch, "top1_val_acc": val_acc})
+            wandb.log({"train_loss": avg_train_loss, "epoch": epoch, "val_acc": val_acc})
 
         wandb.finish()
 

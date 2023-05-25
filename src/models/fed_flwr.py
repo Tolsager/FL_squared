@@ -1,4 +1,5 @@
 from collections import OrderedDict
+import wandb
 from typing import *
 
 import flwr as fl
@@ -37,6 +38,7 @@ class CifarClient(fl.client.NumPyClient):
         epochs: int,
         lr: float,
         device: str,
+        cid: str,
     ):
         self.net = net
         self.train_dl = train_dl
@@ -44,6 +46,8 @@ class CifarClient(fl.client.NumPyClient):
         self.lr = lr
         self.device = device
         self.criterion = torch.nn.CrossEntropyLoss()
+        self.train_loss = torchmetrics.MeanMetric()
+        self.cid = cid
 
     def get_parameters(self, config):
         return get_parameters(self.net)
@@ -57,12 +61,13 @@ class CifarClient(fl.client.NumPyClient):
         return self.get_parameters(config={}), len(self.train_dl), {}
 
     def train(self):
+        self.train_loss.reset()
         # self.net.to(self.device)
         self.net.train()
         optimizer = torch.optim.SGD(
             self.net.parameters(), lr=self.lr, weight_decay=1e-5
         )
-        for _ in range(self.epochs):
+        for epoch in range(self.epochs):
             for image, label in self.train_dl:
                 image = image.to(self.device)
 
@@ -76,7 +81,6 @@ class CifarClient(fl.client.NumPyClient):
 
                 loss.backward()
                 optimizer.step()
-        # self.net.to("cpu")
 
 
 def get_parameters(net) -> List[np.ndarray]:

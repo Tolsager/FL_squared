@@ -111,7 +111,7 @@ def supervised(
         net = resnet.ResNet18Classifier(n_classes=10)
         net.to(DEVICE)
         train_dl = client_dataloaders[int(cid)]
-        return fed_flwr.CifarClient(net, train_dl, local_epochs, lr, DEVICE)
+        return fed_flwr.CifarClient(net, train_dl, local_epochs, lr, DEVICE, cid)
 
     timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M")
     with open("val_scores.txt", "w") as f:

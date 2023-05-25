@@ -16,7 +16,7 @@ GPU = torch.cuda.is_available()
 DEVICE = "cuda" if GPU else "cpu"
 
 
-@click.command(name="centralized")
+@click.command(name="supervised")
 @click.option("--batch-size", default=512, type=int)
 @click.option("--epochs", default=100, type=int)
 @click.option("--learning-rate", default=0.001, type=float)
