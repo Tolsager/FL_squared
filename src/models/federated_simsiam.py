@@ -1,4 +1,5 @@
 import copy
+from datetime import datetime
 
 import torch
 import torchmetrics
@@ -21,6 +22,7 @@ class FedAvgSimSiamTrainer:
         n_classes: int = 10,
         learning_rate: float = 0.005,
         validation_interval: int = 5,
+        iid: bool = False,
     ):
         self.client_dataloaders = client_dataloaders
         self.val_dataloader = val_dataloader
@@ -34,6 +36,9 @@ class FedAvgSimSiamTrainer:
         self.n_classes = n_classes
         self.train_loss = torchmetrics.MeanMetric()
         self.learning_rate = learning_rate
+        self.iid = iid
+        self.best_val_acc = 0.0
+        self.timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M")
         self.models = [None for i in range(self.n_clients)]
         self.validation_interval = validation_interval
 
@@ -68,6 +73,12 @@ class FedAvgSimSiamTrainer:
                 or (round != 0 and (round % self.validation_interval) == 0)
             ):
                 val_acc = self.validate()
+                if val_acc > self.best_val_acc:
+                    self.best_val_acc = val_acc
+                    torch.save(
+                        self.server_model.state_dict(),
+                        f"{'iid_' if self.iid else ''}FedAvgSimSiam_{self.timestamp}.pth",
+                    )
                 wandb.log({"val_acc": val_acc})
         return self.server_model
 

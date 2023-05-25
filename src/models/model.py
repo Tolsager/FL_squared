@@ -1,5 +1,7 @@
+import copy
+import random
 from datetime import datetime
-from typing import Optional
+from typing import List, Tuple, Optional
 
 import resnet
 import torch
@@ -10,7 +12,7 @@ import tqdm
 import wandb
 
 
-class SupervisedTrainer:
+class CentralizedTrainer:
     def __init__(
         self,
         train_dataloader: torch.utils.data.DataLoader,
@@ -37,6 +39,9 @@ class SupervisedTrainer:
         self.val_acc = torchmetrics.Accuracy(task="multiclass", num_classes=10).to(
             self.device
         )
+        self.val_acc = torchmetrics.Accuracy(task="multiclass", num_classes=10).to(self.device)
+        self.best_val_acc = 0.0
+        self.timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M")
 
         self.timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M")
         self.best_val_acc = 0.0
@@ -65,6 +70,7 @@ class SupervisedTrainer:
             print(f"Epoch: {epoch}")
             print(f"Average train loss: {avg_train_loss}")
             val_acc = self.validation()
+
             print(f"Validation accuracy: {val_acc}")
 
             if val_acc > self.best_val_acc:
@@ -75,6 +81,7 @@ class SupervisedTrainer:
             wandb.log(
                 {"train_loss": avg_train_loss, "epoch": epoch, "val_acc": val_acc}
             )
+
 
         wandb.finish()
 
@@ -89,7 +96,6 @@ class SupervisedTrainer:
                 self.val_acc.update(output.argmax(dim=1), label)
 
         return self.val_acc.compute().item()
-
 
 class SupervisedFinetuner(SupervisedTrainer):
     def __init__(
@@ -178,3 +184,4 @@ class SupervisedModel(nn.Module):
         x = self.backbone(img)
         x = self.fc(x)
         return x
+
