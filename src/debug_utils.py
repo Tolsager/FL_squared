@@ -48,7 +48,7 @@ def get_dataset_distribution(datasets: list[Union[torch.utils.data.Dataset, torc
     distributions = []
     for dataset in datasets:
         labels = []
-        for _, label in dataset:
+        for *_, label in dataset:
             labels.append(label)
         distributions.append(np.bincount(labels))
     return distributions
