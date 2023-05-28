@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
+from typing import Union
 
 
 def plot_simsiam_images(dataset, index):
@@ -40,3 +42,14 @@ def are_models_identical(m1: torch.nn.Module, m2: torch.nn.Module):
         if not torch.allclose(v1, v2):
             return False
     return True
+
+
+def get_dataset_distribution(datasets: list[Union[torch.utils.data.Dataset, torch.utils.data.Subset]]):
+    distributions = []
+    for dataset in datasets:
+        labels = []
+        for _, label in dataset:
+            labels.append(label)
+        distributions.append(np.bincount(labels))
+    return distributions
+

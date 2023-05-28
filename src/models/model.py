@@ -14,15 +14,14 @@ import wandb
 
 class CentralizedTrainer:
     def __init__(
-            self,
-            train_dataloader: torch.utils.data.DataLoader,
-            val_dataloader: Optional[torch.utils.data.DataLoader],
-            model: torch.nn.Module,
-            epochs: int = 10,
-            learning_rate: float = 0.001,
-            weight_decay: float = 0,
-            device: str = "cuda",
-            unfreeze: bool = False,
+        self,
+        train_dataloader: torch.utils.data.DataLoader,
+        val_dataloader: Optional[torch.utils.data.DataLoader],
+        model: torch.nn.Module,
+        epochs: int = 10,
+        learning_rate: float = 0.001,
+        weight_decay: float = 0,
+        device: str = "cuda",
     ):
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
@@ -32,19 +31,16 @@ class CentralizedTrainer:
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
         self.optimizer = torch.optim.SGD(
-            model.parameters(), learning_rate, weight_decay=weight_decay
+            self.model.parameters(), self.learning_rate, weight_decay=self.weight_decay
         )
         self.avg_train_loss = torchmetrics.MeanMetric()
         self.criterion = nn.CrossEntropyLoss()
         self.val_acc = torchmetrics.Accuracy(task="multiclass", num_classes=10).to(
             self.device
         )
-        self.val_acc = torchmetrics.Accuracy(task="multiclass", num_classes=10).to(self.device)
         self.best_val_acc = 0.0
         self.timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M")
 
-        self.timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M")
-        self.best_val_acc = 0.0
 
     def train_epoch(self) -> None:
         self.model.train()
@@ -99,17 +95,17 @@ class CentralizedTrainer:
 
 class SupervisedFinetuner(CentralizedTrainer):
     def __init__(
-            self,
-            train_dataloader: torch.utils.data.DataLoader,
-            val_dataloader: Optional[torch.utils.data.DataLoader],
-            model: torch.nn.Module,
-            epochs: int = 10,
-            learning_rate: float = 0.001,
-            weight_decay: float = 0,
-            device: str = "cuda",
-            unfreeze: bool = False,
-            iid: bool = False,
-            model_weights: str = None,
+        self,
+        train_dataloader: torch.utils.data.DataLoader,
+        val_dataloader: Optional[torch.utils.data.DataLoader],
+        model: torch.nn.Module,
+        epochs: int = 10,
+        learning_rate: float = 0.001,
+        weight_decay: float = 0,
+        device: str = "cuda",
+        unfreeze: bool = False,
+        iid: bool = False,
+        model_weights: str = None,
     ):
         super().__init__(
             train_dataloader,
@@ -145,6 +141,10 @@ class SupervisedFinetuner(CentralizedTrainer):
                 torch.save(
                     self.model.state_dict(),
                     f"models/{'iid_' if self.iid else 'non_iid_'}Finetuned_FLS_{self.timestamp}.pth")
+
+                self.optimizer = torch.optim.SGD(
+                    self.model.parameters(), self.learning_rate / 50, weight_decay=self.weight_decay
+                )
 
             wandb.log(
                 {"train_loss": avg_train_loss, "epoch": epoch, "val_acc": val_acc}
