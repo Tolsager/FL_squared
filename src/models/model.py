@@ -136,15 +136,16 @@ class SupervisedFinetuner(CentralizedTrainer):
 
                 self.unfreeze = False
 
+                self.optimizer = torch.optim.SGD(
+                    self.model.parameters(), self.learning_rate / 50, weight_decay=self.weight_decay
+                )
+
             if val_acc > self.best_val_acc:
                 self.best_val_acc = val_acc
                 torch.save(
                     self.model.state_dict(),
                     f"models/{'iid_' if self.iid else 'non_iid_'}Finetuned_FLS_{self.timestamp}.pth")
 
-                self.optimizer = torch.optim.SGD(
-                    self.model.parameters(), self.learning_rate / 50, weight_decay=self.weight_decay
-                )
 
             wandb.log(
                 {"train_loss": avg_train_loss, "epoch": epoch, "val_acc": val_acc}
